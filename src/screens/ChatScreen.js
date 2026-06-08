@@ -46,7 +46,7 @@ import {
   setDoc
 } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 export default function ChatScreen({ user, onBack }) {
   const [messages, setMessages] = useState([]);
