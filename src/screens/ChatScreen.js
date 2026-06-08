@@ -54,8 +54,28 @@ export default function ChatScreen({ user, onBack }) {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
 
+  // Audio Playback States
+  const [playingAudioId, setPlayingAudioId] = useState(null);
+  const [currentSound, setCurrentSound] = useState(null);
+
   const flatListRef = useRef(null);
   const timerRef = useRef(null);
+
+  // Configure Audio Mode on boot for iOS speaker routing
+  useEffect(() => {
+    async function setupAudio() {
+      try {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+          playsInSilentModeIOS: true,
+          shouldRouteThroughEarpieceIOS: false,
+        });
+      } catch (e) {
+        console.warn("Failed to set audio mode:", e);
+      }
+    }
+    setupAudio();
+  }, []);
 
   // 1. Subscribe to Firebase messages
   useEffect(() => {
@@ -98,8 +118,9 @@ export default function ChatScreen({ user, onBack }) {
     return () => {
       unsubscribe();
       if (timerRef.current) clearInterval(timerRef.current);
+      if (currentSound) currentSound.unloadAsync();
     };
-  }, []);
+  }, [currentSound]);
 
   // 2. Send text message
   const handleSendText = async () => {
@@ -135,9 +156,11 @@ export default function ChatScreen({ user, onBack }) {
       const permission = await Audio.requestPermissionsAsync();
       if (permission.status !== 'granted') return;
 
+      // Allow recording on iOS
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
+        shouldRouteThroughEarpieceIOS: false,
       });
 
       const { recording } = await Audio.Recording.createAsync(
@@ -173,6 +196,15 @@ export default function ChatScreen({ user, onBack }) {
     const uri = recording.getURI();
     setRecording(null);
 
+    // Disable recording mode to route playback to standard speaker
+    try {
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        shouldRouteThroughEarpieceIOS: false,
+      });
+    } catch (e) {}
+
     if (Platform.OS !== 'web') {
       Vibration.vibrate(50);
     }
@@ -196,6 +228,59 @@ export default function ChatScreen({ user, onBack }) {
       await recording.stopAndUnloadAsync();
     } catch (e) {}
     setRecording(null);
+
+    try {
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        shouldRouteThroughEarpieceIOS: false,
+      });
+    } catch (e) {}
+  };
+
+  // 8. Playback Voice Notes directly inside the app
+  const handlePlayAudio = async (messageId, audioUrl) => {
+    try {
+      // If the selected voice note is already playing, pause it
+      if (playingAudioId === messageId) {
+        if (currentSound) {
+          await currentSound.stopAsync();
+          await currentSound.unloadAsync();
+          setCurrentSound(null);
+        }
+        setPlayingAudioId(null);
+        return;
+      }
+
+      // If another audio is playing, stop and unload it first
+      if (currentSound) {
+        await currentSound.stopAsync();
+        await currentSound.unloadAsync();
+        setCurrentSound(null);
+      }
+
+      setPlayingAudioId(messageId);
+
+      // Load and play the audio file
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: audioUrl },
+        { shouldPlay: true }
+      );
+
+      setCurrentSound(sound);
+
+      // Listen for when audio finishes playing
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.didJustFinish) {
+          setPlayingAudioId(null);
+          sound.unloadAsync();
+          setCurrentSound(null);
+        }
+      });
+    } catch (error) {
+      console.warn("Error playing audio:", error);
+      setPlayingAudioId(null);
+    }
   };
 
   // 5. Select Images / Videos
@@ -399,13 +484,25 @@ export default function ChatScreen({ user, onBack }) {
                   )}
      
                   {item.type === 'audio' && (
-                    <TouchableOpacity style={styles.mediaBlock} onPress={() => handleDownloadFile(item.fileUrl)}>
+                    <TouchableOpacity 
+                      style={styles.mediaBlock} 
+                      onPress={() => handlePlayAudio(item.id, item.fileUrl)}
+                      activeOpacity={0.8}
+                    >
                       <View style={styles.mediaIconWrapper}>
-                        <Volume2 color="#00f0ff" size={20} />
+                        {playingAudioId === item.id ? (
+                          <Pause color="#00f0ff" size={20} fill="#00f0ff" />
+                        ) : (
+                          <Play color="#00f0ff" size={20} fill="#00f0ff" />
+                        )}
                       </View>
                       <View style={styles.mediaDetails}>
-                        <Text style={styles.mediaTitle} numberOfLines={1}>Voice Note</Text>
-                        <Text style={styles.mediaSubtitle}>Play Audio</Text>
+                        <Text style={styles.mediaTitle} numberOfLines={1}>
+                          {playingAudioId === item.id ? 'Playing Voice Note...' : 'Voice Note'}
+                        </Text>
+                        <Text style={styles.mediaSubtitle}>
+                          {playingAudioId === item.id ? 'Tap to Pause' : 'Tap to Play'}
+                        </Text>
                       </View>
                     </TouchableOpacity>
                   )}
