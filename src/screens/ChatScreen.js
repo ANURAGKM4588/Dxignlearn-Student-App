@@ -404,7 +404,7 @@ export default function ChatScreen({ user, onBack }) {
       setUploadProgress(15);
       // Read the file as a base64 string
       const base64Data = await FileSystem.readAsStringAsync(localUri, {
-        encoding: FileSystem.EncodingType.Base64,
+        encoding: 'base64',
       });
 
       setUploadProgress(45);
