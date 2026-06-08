@@ -7,7 +7,8 @@ import {
   View,
   Text,
   TouchableOpacity,
-  Platform
+  Platform,
+  Image
 } from 'react-native';
 import LoginScreen from './src/screens/LoginScreen';
 import CoursesScreen from './src/screens/CoursesScreen';
@@ -48,8 +49,16 @@ export default function App() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <StatusBar barStyle="light-content" />
-        <ActivityIndicator size="large" color="#00f0ff" />
+        <StatusBar barStyle="light-content" backgroundColor="#050505" />
+        <View style={styles.loadingLogoWrapper}>
+          <Image 
+            source={require('./assets/logo.png')} 
+            style={styles.loadingLogo} 
+            resizeMode="contain" 
+          />
+          <Text style={styles.loadingSubtitle}>STUDENT PORTAL</Text>
+        </View>
+        <ActivityIndicator size="small" color="#00f0ff" style={styles.loadingSpinner} />
       </View>
     );
   }
@@ -152,6 +161,25 @@ const styles = StyleSheet.create({
     backgroundColor: '#050505',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  loadingLogoWrapper: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  loadingLogo: {
+    width: 170,
+    height: 48,
+    marginBottom: 8,
+  },
+  loadingSubtitle: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    color: '#00f0ff',
+    letterSpacing: 4,
+    textTransform: 'uppercase',
+  },
+  loadingSpinner: {
+    marginTop: 8,
   },
   mainWrapper: {
     flex: 1,
