@@ -12,7 +12,7 @@ import {
   Image,
   Vibration
 } from 'react-native';
-import { Audio } from 'expo-av';
+import { Audio, Video } from 'expo-av';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Sharing from 'expo-sharing';
@@ -31,7 +31,8 @@ import {
   Camera, 
   Phone, 
   MoreVertical, 
-  Volume2
+  Volume2,
+  X
 } from 'lucide-react-native';
 import { db, storage } from '../services/firebase';
 import { 
@@ -57,6 +58,9 @@ export default function ChatScreen({ user, onBack }) {
   // Audio Playback States
   const [playingAudioId, setPlayingAudioId] = useState(null);
   const [currentSound, setCurrentSound] = useState(null);
+
+  // Media Preview Modal States
+  const [previewMedia, setPreviewMedia] = useState(null); // { type: 'image'|'video'|'document', url: string, fileName?: string }
 
   const flatListRef = useRef(null);
   const timerRef = useRef(null);
@@ -466,19 +470,22 @@ export default function ChatScreen({ user, onBack }) {
                   )}
      
                   {item.type === 'image' && (
-                    <TouchableOpacity onPress={() => handleDownloadFile(item.fileUrl)}>
+                    <TouchableOpacity onPress={() => setPreviewMedia({ type: 'image', url: item.fileUrl })}>
                       <Image source={{ uri: item.fileUrl }} style={styles.attachmentImage} resizeMode="cover" />
                     </TouchableOpacity>
                   )}
      
                   {item.type === 'video' && (
-                    <TouchableOpacity style={styles.mediaBlock} onPress={() => handleDownloadFile(item.fileUrl)}>
+                    <TouchableOpacity 
+                      style={styles.mediaBlock} 
+                      onPress={() => setPreviewMedia({ type: 'video', url: item.fileUrl, fileName: item.fileName })}
+                    >
                       <View style={styles.mediaIconWrapper}>
                         <Play color="#00f0ff" size={20} fill="#00f0ff" />
                       </View>
                       <View style={styles.mediaDetails}>
                         <Text style={styles.mediaTitle} numberOfLines={1}>{item.fileName || 'Video Attachment'}</Text>
-                        <Text style={styles.mediaSubtitle}>Play video</Text>
+                        <Text style={styles.mediaSubtitle}>Tap to play video</Text>
                       </View>
                     </TouchableOpacity>
                   )}
@@ -508,13 +515,16 @@ export default function ChatScreen({ user, onBack }) {
                   )}
      
                   {item.type === 'document' && (
-                    <TouchableOpacity style={styles.mediaBlock} onPress={() => handleDownloadFile(item.fileUrl)}>
+                    <TouchableOpacity 
+                      style={styles.mediaBlock} 
+                      onPress={() => setPreviewMedia({ type: 'document', url: item.fileUrl, fileName: item.fileName })}
+                    >
                       <View style={styles.mediaIconWrapper}>
                         <FileText color="#a855f7" size={20} />
                       </View>
                       <View style={styles.mediaDetails}>
                         <Text style={styles.mediaTitle} numberOfLines={1}>{item.fileName}</Text>
-                        <Text style={styles.mediaSubtitle}>Download PDF / Doc</Text>
+                        <Text style={styles.mediaSubtitle}>Tap to preview document</Text>
                       </View>
                     </TouchableOpacity>
                   )}
@@ -634,6 +644,62 @@ export default function ChatScreen({ user, onBack }) {
           </TouchableOpacity>
         )}
       </View>
+
+      {/* 6. Media Preview Modal (Frosted Glass Fullscreen Overlay) */}
+      {previewMedia && (
+        <View style={styles.previewModal}>
+          <TouchableOpacity 
+            style={styles.previewCloseBtn} 
+            onPress={() => setPreviewMedia(null)}
+            activeOpacity={0.7}
+          >
+            <X color="#fff" size={24} />
+          </TouchableOpacity>
+
+          <View style={styles.previewContentContainer}>
+            {previewMedia.type === 'image' && (
+              <Image 
+                source={{ uri: previewMedia.url }} 
+                style={styles.fullPreviewImage} 
+                resizeMode="contain" 
+              />
+            )}
+
+            {previewMedia.type === 'video' && (
+              <Video
+                source={{ uri: previewMedia.url }}
+                rate={1.0}
+                volume={1.0}
+                isMuted={false}
+                resizeMode="contain"
+                shouldPlay
+                useNativeControls
+                style={styles.fullPreviewVideo}
+              />
+            )}
+
+            {previewMedia.type === 'document' && (
+              <View style={styles.docPreviewCard}>
+                <FileText color="#a855f7" size={64} style={{ marginBottom: 16 }} />
+                <Text style={styles.docPreviewTitle} numberOfLines={2}>
+                  {previewMedia.fileName || 'document.pdf'}
+                </Text>
+                <Text style={styles.docPreviewSubtitle}>
+                  Document Attachment
+                </Text>
+                
+                <TouchableOpacity 
+                  style={styles.docDownloadBtn} 
+                  onPress={() => handleDownloadFile(previewMedia.url)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.docDownloadBtnText}>SHARE / DOWNLOAD DOCUMENT</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -971,5 +1037,86 @@ const styles = StyleSheet.create({
     backgroundColor: '#ef4444',
     shadowColor: '#ef4444',
     transform: [{ scale: 1.15 }],
+  },
+  previewModal: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(5, 5, 5, 0.96)', // Deep dark transparent backing
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  previewCloseBtn: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 50 : 20,
+    right: 20,
+    padding: 10,
+    zIndex: 1001,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 22,
+  },
+  previewContentContainer: {
+    width: '100%',
+    height: '80%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  fullPreviewImage: {
+    width: '100%',
+    height: '100%',
+  },
+  fullPreviewVideo: {
+    width: '100%',
+    height: '100%',
+  },
+  docPreviewCard: {
+    width: '90%',
+    maxWidth: 340,
+    backgroundColor: '#0b0b0c',
+    borderRadius: 24,
+    borderWidth: 1.5,
+    borderColor: 'rgba(168, 85, 247, 0.2)', // Glowing purple card
+    padding: 32,
+    alignItems: 'center',
+    shadowColor: '#a855f7',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 15,
+    elevation: 5,
+  },
+  docPreviewTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  docPreviewSubtitle: {
+    fontSize: 11,
+    color: '#666',
+    marginBottom: 24,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  docDownloadBtn: {
+    backgroundColor: '#a855f7',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    shadowColor: '#a855f7',
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+  },
+  docDownloadBtnText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1,
   }
 });
