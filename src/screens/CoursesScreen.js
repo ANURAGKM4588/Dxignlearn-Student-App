@@ -14,36 +14,182 @@ import { COURSE_PAYMENT_LINKS, COURSE_PRICING } from '../services/firebase';
 
 const ALL_COURSES = ["Graphic Design", "Film Making", "Content Creation", "Vibe Coding", "Business Automation"];
 
-// Simulated course curriculum structure
+// Simulated course curriculum structure with enriched metadata
 const COURSE_CURRICULUM = {
   "Graphic Design": [
-    { id: "gd-1", title: "CGI Ad Video - Tender Coconut", duration: "1 min", videoUrl: "https://dxignlearn.vercel.app/public/Images/videos/CGI%20Ad%20Video%20Tender%20coconut.mp4" },
-    { id: "gd-2", title: "Golden Tea Ad Commercial", duration: "1 min", videoUrl: "https://dxignlearn.vercel.app/public/Images/videos/Golden%20tea%20Ad.mp4" },
-    { id: "gd-3", title: "Jewllery Advertisement Showcase", duration: "1 min", videoUrl: "https://dxignlearn.vercel.app/public/Images/videos/Jewllery%20ads.mp4" }
+    { 
+      id: "gd-1", 
+      title: "CGI Ad Video - Tender Coconut", 
+      duration: "1 min", 
+      videoUrl: "https://dxignlearn.vercel.app/public/Images/videos/CGI%20Ad%20Video%20Tender%20coconut.mp4",
+      description: "Learn how to build visual 3D tender coconut elements and integrate them into dynamic commercial CGI layouts. Perfect for advertising creatives.",
+      difficulty: "Intermediate",
+      tags: ["CGI", "Product Ad", "Blender"],
+      resources: [
+        { name: "3D Tender Coconut Asset Bundle", size: "14.2 MB" },
+        { name: "Lighting & Materials Setup Guide PDF", size: "2.4 MB" }
+      ]
+    },
+    { 
+      id: "gd-2", 
+      title: "Golden Tea Ad Commercial", 
+      duration: "1 min", 
+      videoUrl: "https://dxignlearn.vercel.app/public/Images/videos/Golden%20tea%20Ad.mp4",
+      description: "Step-by-step breakdown of designing fluid tea animations and gold branding highlights for high-end beverage commercials.",
+      difficulty: "Advanced",
+      tags: ["Fluids simulation", "Gold VFX", "Color Grading"],
+      resources: [
+        { name: "Gold Material Settings & Presets", size: "1.8 MB" }
+      ]
+    },
+    { 
+      id: "gd-3", 
+      title: "Jewllery Advertisement Showcase", 
+      duration: "1 min", 
+      videoUrl: "https://dxignlearn.vercel.app/public/Images/videos/Jewllery%20ads.mp4",
+      description: "Mastering micro-refraction and diamond lighting angles to create luxury jewellery ads. Focus on composition and depth of field.",
+      difficulty: "Advanced",
+      tags: ["Macro lighting", "Jewellery design", "Render passes"],
+      resources: [
+        { name: "Luxury Studio HDRI Map", size: "32.0 MB" },
+        { name: "Refraction Index Guide CheatSheet", size: "850 KB" }
+      ]
+    }
   ],
   "Film Making": [
-    { id: "fm-1", title: "Cinematic Car Ads Project", duration: "1 min", videoUrl: "https://dxignlearn.vercel.app/public/Images/videos/Car%20Ads.mp4" },
-    { id: "fm-2", title: "Grandma's Sweet Storyboard Video", duration: "2 mins", videoUrl: "https://dxignlearn.vercel.app/public/Images/videos/Grandma%27s%20Sweet.mp4" },
-    { id: "fm-3", title: "Romantic Couple Short Cinematic", duration: "1 min", videoUrl: "https://dxignlearn.vercel.app/public/Images/videos/Romantic%20Couple%20Short%20video.mp4" }
+    { 
+      id: "fm-1", 
+      title: "Cinematic Car Ads Project", 
+      duration: "1 min", 
+      videoUrl: "https://dxignlearn.vercel.app/public/Images/videos/Car%20Ads.mp4",
+      description: "Explore camera paths, dynamic pacing, and sound design layers to construct high-energy, cinematic automotive commercials.",
+      difficulty: "Intermediate",
+      tags: ["Speed ramping", "Camera paths", "Sound design"],
+      resources: [
+        { name: "Sound Design SFX Pack", size: "45.1 MB" }
+      ]
+    },
+    { 
+      id: "fm-2", 
+      title: "Grandma's Sweet Storyboard Video", 
+      duration: "2 mins", 
+      videoUrl: "https://dxignlearn.vercel.app/public/Images/videos/Grandma%27s%20Sweet.mp4",
+      description: "How to tell emotional, narrative-driven stories through cinematography. Analyzing framing, warm lighting, and actor pacing.",
+      difficulty: "Beginner",
+      tags: ["Storytelling", "Warm lighting", "Framing"],
+      resources: [
+        { name: "Storyboard Blank Template PDF", size: "1.1 MB" }
+      ]
+    },
+    { 
+      id: "fm-3", 
+      title: "Romantic Couple Short Cinematic", 
+      duration: "1 min", 
+      videoUrl: "https://dxignlearn.vercel.app/public/Images/videos/Romantic%20Couple%20Short%20video.mp4",
+      description: "Focus on capturing slow-motion expressions, sunset backlighting, and warm-toned color grading for romantic visuals.",
+      difficulty: "Beginner",
+      tags: ["Slow motion", "Backlighting", "Grading"],
+      resources: [
+        { name: "LUTs Pack - Cinematic Warm Gold", size: "8.4 MB" }
+      ]
+    }
   ],
   "Content Creation": [
-    { id: "cc-1", title: "KOME Reel - French Edition", duration: "1 min", videoUrl: "https://dxignlearn.vercel.app/public/Images/videos/KOME%20Reel%20-2%20French.mp4" },
-    { id: "cc-2", title: "Mayflower Reel 2 Project", duration: "1 min", videoUrl: "https://dxignlearn.vercel.app/public/Images/videos/Mayflower%20Reel%202.mp4" },
-    { id: "cc-3", title: "Regalia Brand Reel 1", duration: "1 min", videoUrl: "https://dxignlearn.vercel.app/public/Images/videos/Regalia%20reel%201.mp4" }
+    { 
+      id: "cc-1", 
+      title: "KOME Reel - French Edition", 
+      duration: "1 min", 
+      videoUrl: "https://dxignlearn.vercel.app/public/Images/videos/KOME%20Reel%20-2%20French.mp4",
+      description: "Dissecting fast-paced typography transitions and modern French aesthetics used to capture high engagement in brand reels.",
+      difficulty: "Intermediate",
+      tags: ["Kinetic text", "Transitions", "Reels format"],
+      resources: [
+        { name: "Premiere Pro Text Templates", size: "12.2 MB" }
+      ]
+    },
+    { 
+      id: "cc-2", 
+      title: "Mayflower Reel 2 Project", 
+      duration: "1 min", 
+      videoUrl: "https://dxignlearn.vercel.app/public/Images/videos/Mayflower%20Reel%202.mp4",
+      description: "Advanced audio syncing techniques and creative text overlays to create visual impact for storytelling reels.",
+      difficulty: "Intermediate",
+      tags: ["Audio syncing", "Text overlays", "Retention tips"],
+      resources: [
+        { name: "Hook Templates (50 Script Ideas)", size: "420 KB" }
+      ]
+    },
+    { 
+      id: "cc-3", 
+      title: "Regalia Brand Reel 1", 
+      duration: "1 min", 
+      videoUrl: "https://dxignlearn.vercel.app/public/Images/videos/Regalia%20reel%201.mp4",
+      description: "Clean aesthetic product shots with smooth pan camera moves. Crafting premium content on budget setups.",
+      difficulty: "Beginner",
+      tags: ["Product shots", "Pan movements", "Budget setups"],
+      resources: [
+        { name: "Budget Equipment Guide PDF", size: "3.5 MB" }
+      ]
+    }
   ],
   "Vibe Coding": [
-    { id: "vc-1", title: "Reshma Website WebQ Reel", duration: "1 min", videoUrl: "https://dxignlearn.vercel.app/public/Images/videos/Reshma%20Website%20WebQ%20Reel%201.mp4" },
-    { id: "vc-2", title: "Velox Reel System Integration", duration: "2 mins", videoUrl: "https://dxignlearn.vercel.app/public/Images/videos/Velox%20Reel%201.mp4" }
+    { 
+      id: "vc-1", 
+      title: "Reshma Website WebQ Reel", 
+      duration: "1 min", 
+      videoUrl: "https://dxignlearn.vercel.app/public/Images/videos/Reshma%20Website%20WebQ%20Reel%201.mp4",
+      description: "Watch the build flow of a developer landing page using Claude 3.5 Sonnet. Best practices in prompt structure and component validation.",
+      difficulty: "Beginner",
+      tags: ["Claude 3.5", "Vite JS", "Components"],
+      resources: [
+        { name: "Prompts System Template MD", size: "120 KB" }
+      ]
+    },
+    { 
+      id: "vc-2", 
+      title: "Velox Reel System Integration", 
+      duration: "2 mins", 
+      videoUrl: "https://dxignlearn.vercel.app/public/Images/videos/Velox%20Reel%201.mp4",
+      description: "Building database hooks and payment checkouts dynamically with generative code tools. Complete testing guide.",
+      difficulty: "Advanced",
+      tags: ["API hooks", "Payments integration", "Node JS"],
+      resources: [
+        { name: "Stripe Webhook Script template", size: "45 KB" }
+      ]
+    }
   ],
   "Business Automation": [
-    { id: "ba-1", title: "Sky Bound Travel Agency Automations", duration: "1 min", videoUrl: "https://dxignlearn.vercel.app/public/Images/videos/Sky%20Bound%20Traval%20Agency.mp4" },
-    { id: "ba-2", title: "OPTIC EXPO 2025 System Demo", duration: "1 min", videoUrl: "https://dxignlearn.vercel.app/public/Images/videos/OPTIC%20EXPO%202025,.mp4" }
+    { 
+      id: "ba-1", 
+      title: "Sky Bound Travel Agency Automations", 
+      duration: "1 min", 
+      videoUrl: "https://dxignlearn.vercel.app/public/Images/videos/Sky%20Bound%20Traval%20Agency.mp4",
+      description: "Automate leads from Google Ads directly to WhatsApp notifications and CRM databases using Make.com (integromat).",
+      difficulty: "Intermediate",
+      tags: ["Make.com", "CRM Sync", "WhatsApp API"],
+      resources: [
+        { name: "Make.com Scenario blueprint JSON", size: "340 KB" }
+      ]
+    },
+    { 
+      id: "ba-2", 
+      title: "OPTIC EXPO 2025 System Demo", 
+      duration: "1 min", 
+      videoUrl: "https://dxignlearn.vercel.app/public/Images/videos/OPTIC%20EXPO%202025,.mp4",
+      description: "Bulk registration automations and check-in system design utilizing QR scanning and Apps Script sync logs.",
+      difficulty: "Advanced",
+      tags: ["QR verification", "Google Sheets API", "Expo Router"],
+      resources: [
+        { name: "QR Scanner React Native hook code", size: "12 KB" }
+      ]
+    }
   ]
 };
 
 export default function CoursesScreen({ user }) {
   const [selectedCourse, setSelectedCourse] = useState(user.courses[0] || "Graphic Design");
   const [currentVideo, setCurrentVideo] = useState(COURSE_CURRICULUM[selectedCourse]?.[0] || null);
+  const [downloadingResource, setDownloadingResource] = useState({});
 
   const isEnrolled = user.courses.includes(selectedCourse);
 
@@ -58,6 +204,17 @@ export default function CoursesScreen({ user }) {
       return;
     }
     setCurrentVideo(video);
+  };
+
+  const handleDownloadResource = (resourceName) => {
+    if (downloadingResource[resourceName]) return;
+    
+    setDownloadingResource(prev => ({ ...prev, [resourceName]: 'downloading' }));
+    
+    setTimeout(() => {
+      setDownloadingResource(prev => ({ ...prev, [resourceName]: 'done' }));
+      alert(`Successfully saved "${resourceName}" to your local downloads folder!`);
+    }, 2000);
   };
 
   return (
@@ -101,41 +258,124 @@ export default function CoursesScreen({ user }) {
         )}
       </View>
 
-      {/* Selected video details */}
-      <View style={styles.videoDetails}>
-        <Text style={styles.videoCategory}>{selectedCourse.toUpperCase()}</Text>
-        <Text style={styles.videoTitle}>{currentVideo && isEnrolled ? currentVideo.title : !isEnrolled ? "Access Blocked" : "No lecture playing"}</Text>
-        <Text style={styles.videoDuration}>{currentVideo && isEnrolled ? `Duration: ${currentVideo.duration}` : ""}</Text>
-      </View>
-
-      {/* Course selectors */}
-      <View style={styles.courseTabs}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScroll}>
-          {ALL_COURSES.map((course) => {
-            const courseEnrolled = user.courses.includes(course);
-            return (
-              <TouchableOpacity 
-                key={course}
-                style={[styles.tab, selectedCourse === course && styles.activeTab]}
-                onPress={() => {
-                  setSelectedCourse(course);
-                  setCurrentVideo(COURSE_CURRICULUM[course]?.[0] || null);
-                }}
-              >
-                <Text style={[styles.tabText, selectedCourse === course && styles.activeTabText]}>
-                  {course} {!courseEnrolled && "🔒"}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
-
-      {/* Curriculum list */}
+      {/* Scrollable details and chapters */}
       <FlatList
         data={COURSE_CURRICULUM[selectedCourse] || []}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.curriculumList}
+        ListHeaderComponent={
+          <View style={styles.headerComponent}>
+            {/* Selected video details */}
+            <View style={styles.videoDetails}>
+              <View style={styles.detailsHeaderRow}>
+                <Text style={styles.videoCategory}>{selectedCourse.toUpperCase()}</Text>
+                {currentVideo && isEnrolled && currentVideo.difficulty && (
+                  <View style={[
+                    styles.difficultyBadge, 
+                    currentVideo.difficulty === 'Beginner' ? styles.badgeBeginner :
+                    currentVideo.difficulty === 'Intermediate' ? styles.badgeIntermediate : styles.badgeAdvanced
+                  ]}>
+                    <Text style={[
+                      styles.difficultyText,
+                      currentVideo.difficulty === 'Beginner' ? styles.textBeginner :
+                      currentVideo.difficulty === 'Intermediate' ? styles.textIntermediate : styles.textAdvanced
+                    ]}>{currentVideo.difficulty.toUpperCase()}</Text>
+                  </View>
+                )}
+              </View>
+
+              <Text style={styles.videoTitle}>
+                {currentVideo && isEnrolled ? currentVideo.title : !isEnrolled ? "Access Blocked" : "No lecture playing"}
+              </Text>
+              
+              {currentVideo && isEnrolled && (
+                <View style={styles.lectureMetaRow}>
+                  <Text style={styles.videoDuration}>Duration: {currentVideo.duration}</Text>
+                </View>
+              )}
+
+              {/* Skill Pills */}
+              {currentVideo && isEnrolled && currentVideo.tags && (
+                <View style={styles.tagsContainer}>
+                  {currentVideo.tags.map(tag => (
+                    <View key={tag} style={styles.tagPill}>
+                      <Text style={styles.tagPillText}>#{tag}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {/* Expandable Description Block */}
+              {currentVideo && isEnrolled && currentVideo.description && (
+                <View style={styles.descriptionBlock}>
+                  <Text style={styles.descriptionTitle}>Lecture Summary</Text>
+                  <Text style={styles.descriptionText}>{currentVideo.description}</Text>
+                </View>
+              )}
+
+              {/* Downloadable Assets & Resources */}
+              {currentVideo && isEnrolled && currentVideo.resources && currentVideo.resources.length > 0 && (
+                <View style={styles.resourcesContainer}>
+                  <Text style={styles.resourcesTitle}>Downloadable Resources</Text>
+                  {currentVideo.resources.map((res) => {
+                    const dlState = downloadingResource[res.name];
+                    return (
+                      <TouchableOpacity 
+                        key={res.name}
+                        style={styles.resourceRow}
+                        onPress={() => handleDownloadResource(res.name)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={styles.resourceMetaInfo}>
+                          <Text style={styles.resourceIcon}>📁</Text>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.resourceNameText} numberOfLines={1}>{res.name}</Text>
+                            <Text style={styles.resourceSizeText}>{res.size}</Text>
+                          </View>
+                        </View>
+                        <View style={[
+                          styles.downloadBadge, 
+                          dlState === 'downloading' && styles.dlProgress,
+                          dlState === 'done' && styles.dlComplete
+                        ]}>
+                          <Text style={styles.downloadBadgeText}>
+                            {dlState === 'downloading' ? "Saving..." :
+                             dlState === 'done' ? "✓ Saved" : "Get File 📥"}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
+
+            {/* Course selectors */}
+            <View style={styles.courseTabs}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScroll}>
+                {ALL_COURSES.map((course) => {
+                  const courseEnrolled = user.courses.includes(course);
+                  return (
+                    <TouchableOpacity 
+                      key={course}
+                      style={[styles.tab, selectedCourse === course && styles.activeTab]}
+                      onPress={() => {
+                        setSelectedCourse(course);
+                        setCurrentVideo(COURSE_CURRICULUM[course]?.[0] || null);
+                      }}
+                    >
+                      <Text style={[styles.tabText, selectedCourse === course && styles.activeTabText]}>
+                        {course} {!courseEnrolled && "🔒"}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+            
+            <Text style={styles.curriculumSectionTitle}>Course Syllabus & Chapters</Text>
+          </View>
+        }
         renderItem={({ item }) => (
           <TouchableOpacity 
             style={[styles.lectureItem, currentVideo?.id === item.id && isEnrolled && styles.activeLectureItem]}
@@ -199,31 +439,176 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
   },
+  headerComponent: {
+    backgroundColor: '#050505',
+  },
   videoDetails: {
     padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  detailsHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   videoCategory: {
     color: '#a855f7',
     fontSize: 9,
     fontWeight: 'bold',
     letterSpacing: 1.5,
-    marginBottom: 4,
   },
+  difficultyBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 0.5,
+  },
+  badgeBeginner: {
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  badgeIntermediate: {
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    borderColor: 'rgba(245, 158, 11, 0.3)',
+  },
+  badgeAdvanced: {
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+  },
+  difficultyText: {
+    fontSize: 8,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
+  },
+  textBeginner: { color: '#10b981' },
+  textIntermediate: { color: '#f59e0b' },
+  textAdvanced: { color: '#ef4444' },
   videoTitle: {
     color: '#fff',
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  lectureMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   videoDuration: {
     color: '#555',
     fontSize: 11,
-    marginTop: 4,
+  },
+  tagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 16,
+  },
+  tagPill: {
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.08)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  tagPillText: {
+    color: '#999',
+    fontSize: 10,
+    fontWeight: '500',
+  },
+  descriptionBlock: {
+    backgroundColor: 'rgba(255,255,255,0.01)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+  },
+  descriptionTitle: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: 'bold',
+    marginBottom: 4,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  descriptionText: {
+    color: '#888',
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  resourcesContainer: {
+    marginTop: 8,
+  },
+  resourcesTitle: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  resourceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#0b0b0c',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.04)',
+    padding: 12,
+    marginBottom: 8,
+    gap: 12,
+  },
+  resourceMetaInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 10,
+  },
+  resourceIcon: {
+    fontSize: 18,
+  },
+  resourceNameText: {
+    color: '#eee',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  resourceSizeText: {
+    color: '#555',
+    fontSize: 10,
+    marginTop: 2,
+  },
+  downloadBadge: {
+    backgroundColor: 'rgba(0, 240, 255, 0.08)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(0, 240, 255, 0.2)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  dlProgress: {
+    backgroundColor: 'rgba(245, 158, 11, 0.08)',
+    borderColor: '#f59e0b',
+  },
+  dlComplete: {
+    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+    borderColor: '#10b981',
+  },
+  downloadBadgeText: {
+    color: '#00f0ff',
+    fontSize: 9,
+    fontWeight: 'bold',
   },
   courseTabs: {
     paddingVertical: 12,
     backgroundColor: '#0b0b0c',
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: 'rgba(255,255,255,0.04)',
   },
   tabScroll: {
     paddingHorizontal: 16,
@@ -250,16 +635,27 @@ const styles = StyleSheet.create({
     color: '#050505',
     fontWeight: 'bold',
   },
+  curriculumSectionTitle: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 8,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
   curriculumList: {
-    padding: 20,
-    gap: 12,
+    paddingBottom: 24,
+    gap: 8,
   },
   lectureItem: {
     backgroundColor: '#0b0b0c',
     borderRadius: 14,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.04)',
-    padding: 16,
+    padding: 14,
+    marginHorizontal: 20,
   },
   activeLectureItem: {
     borderColor: 'rgba(0, 240, 255, 0.3)',

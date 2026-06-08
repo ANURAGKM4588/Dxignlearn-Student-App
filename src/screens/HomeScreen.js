@@ -5,9 +5,7 @@ import {
   StyleSheet, 
   ScrollView, 
   TouchableOpacity, 
-  Image, 
-  Dimensions,
-  Linking
+  Dimensions 
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COURSE_PAYMENT_LINKS, COURSE_PRICING } from '../services/firebase';
@@ -20,7 +18,6 @@ const UPCOMING_COURSES = [
     title: "AI Cinema & Runway Gen-3 Mastery",
     launchDate: "July 15, 2026",
     instructor: "Anurag KM",
-    image: "https://dxignlearn.vercel.app/public/Images/logo/AboutusIcon.png",
     description: "Learn advanced cinematic camera prompting, consistent character generation, and post-production."
   },
   {
@@ -28,7 +25,6 @@ const UPCOMING_COURSES = [
     title: "Advanced Vibe Coding & Claude 3.5",
     launchDate: "August 02, 2026",
     instructor: "Dxign.learn Team",
-    image: "https://dxignlearn.vercel.app/public/Images/logo/Faveicon.png",
     description: "Build production-ready web apps purely through prompt engineering, code synthesis, and API integration."
   }
 ];
@@ -65,7 +61,7 @@ export default function HomeScreen({ user, onNavigateToTab }) {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
-      {/* Welcome & Stats Row */}
+      {/* Welcome Row */}
       <View style={styles.welcomeContainer}>
         <View>
           <Text style={styles.greetingText}>Welcome back,</Text>
@@ -76,14 +72,34 @@ export default function HomeScreen({ user, onNavigateToTab }) {
         </View>
       </View>
 
-      {/* Hero Header Card */}
+      {/* Mentor Online Status Card */}
+      <TouchableOpacity 
+        style={styles.mentorStatusCard}
+        onPress={() => onNavigateToTab('chat')}
+        activeOpacity={0.85}
+      >
+        <View style={styles.mentorStatusHeader}>
+          <View style={styles.pulseContainer}>
+            <View style={styles.pulseCircle} />
+            <View style={styles.pulseIndicator} />
+          </View>
+          <Text style={styles.mentorStatusTitle}>MENTOR ONLINE SUPPORT</Text>
+        </View>
+        <Text style={styles.mentorStatusText}>Stuck on a lesson? Anurag KM is available online to resolve your doubts right now.</Text>
+        <View style={styles.mentorStatusFooter}>
+          <Text style={styles.avgResponseText}>Average response time: ~4 mins</Text>
+          <Text style={styles.mentorStatusLinkText}>Start Chat →</Text>
+        </View>
+      </TouchableOpacity>
+
+      {/* Last Played Class Hero Card */}
       <TouchableOpacity 
         style={styles.heroCard}
         onPress={() => onNavigateToTab('courses')}
         activeOpacity={0.9}
       >
         <View style={styles.heroGradientOverlay}>
-          <Text style={styles.heroTag}>LAST PLAYED CLASS</Text>
+          <Text style={styles.heroTag}>CONTINUE LEARNING</Text>
           <Text style={styles.heroTitle}>CGI Ad Video - Tender Coconut</Text>
           <Text style={styles.heroSubtitle}>Graphic Design • Lecture 1 of 3</Text>
           
@@ -120,7 +136,7 @@ export default function HomeScreen({ user, onNavigateToTab }) {
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Your Enrolled Courses</Text>
         <TouchableOpacity onPress={() => onNavigateToTab('courses')}>
-          <Text style={styles.seeAllText}>See All</Text>
+          <Text style={styles.seeAllText}>Watch Lectures</Text>
         </TouchableOpacity>
       </View>
 
@@ -188,7 +204,7 @@ export default function HomeScreen({ user, onNavigateToTab }) {
         </View>
       )}
 
-      {/* Upcoming Courses Banner Section */}
+      {/* Upcoming Courses Section */}
       <Text style={styles.sectionTitleUpcoming}>Upcoming Programs & Webinars</Text>
       
       <ScrollView 
@@ -271,6 +287,72 @@ const styles = StyleSheet.create({
   avatarText: {
     color: '#00f0ff',
     fontSize: 18,
+    fontWeight: 'bold',
+  },
+  mentorStatusCard: {
+    backgroundColor: '#0b0b0c',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 240, 255, 0.15)',
+    padding: 16,
+    marginBottom: 24,
+    shadowColor: '#00f0ff',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  mentorStatusHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  pulseContainer: {
+    width: 8,
+    height: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pulseCircle: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#10b981',
+  },
+  pulseIndicator: {
+    position: 'absolute',
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#10b981',
+    opacity: 0.4,
+  },
+  mentorStatusTitle: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    color: '#10b981',
+    letterSpacing: 1.5,
+  },
+  mentorStatusText: {
+    fontSize: 12,
+    color: '#888',
+    lineHeight: 18,
+    marginBottom: 10,
+  },
+  mentorStatusFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  avgResponseText: {
+    fontSize: 10,
+    color: '#555',
+    fontWeight: '600',
+  },
+  mentorStatusLinkText: {
+    fontSize: 11,
+    color: '#00f0ff',
     fontWeight: 'bold',
   },
   heroCard: {
@@ -437,6 +519,57 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
+  catalogSection: {
+    marginBottom: 28,
+  },
+  catalogList: {
+    gap: 12,
+    marginTop: 12,
+  },
+  catalogCard: {
+    flexDirection: 'row',
+    backgroundColor: '#0b0b0c',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+    padding: 16,
+    alignItems: 'center',
+  },
+  catalogCardBody: {
+    flex: 1,
+  },
+  catalogCardTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  catalogCardPrice: {
+    fontSize: 12,
+    color: '#00f0ff',
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  catalogCardBenefit: {
+    fontSize: 10,
+    color: '#666',
+  },
+  catalogBuyBtn: {
+    backgroundColor: '#a855f7',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    shadowColor: '#a855f7',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+  },
+  catalogBuyBtnText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
   sectionTitleUpcoming: {
     fontSize: 16,
     fontWeight: 'bold',
@@ -525,56 +658,5 @@ const styles = StyleSheet.create({
   },
   notifyBtnTextActive: {
     color: '#10b981',
-  },
-  catalogSection: {
-    marginBottom: 28,
-  },
-  catalogList: {
-    gap: 12,
-    marginTop: 12,
-  },
-  catalogCard: {
-    flexDirection: 'row',
-    backgroundColor: '#0b0b0c',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
-    padding: 16,
-    alignItems: 'center',
-  },
-  catalogCardBody: {
-    flex: 1,
-  },
-  catalogCardTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 4,
-  },
-  catalogCardPrice: {
-    fontSize: 12,
-    color: '#00f0ff',
-    fontWeight: '600',
-    marginBottom: 6,
-  },
-  catalogCardBenefit: {
-    fontSize: 10,
-    color: '#666',
-  },
-  catalogBuyBtn: {
-    backgroundColor: '#a855f7',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 10,
-    shadowColor: '#a855f7',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-  },
-  catalogBuyBtnText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.5,
   }
 });
