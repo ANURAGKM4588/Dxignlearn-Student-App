@@ -432,9 +432,10 @@ export default function ChatScreen({ user, onBack }) {
       const response = await fetch(APPS_SCRIPT_WEBHOOK, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'text/plain;charset=utf-8',
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        redirect: 'follow'
       });
 
       setUploadProgress(85);
