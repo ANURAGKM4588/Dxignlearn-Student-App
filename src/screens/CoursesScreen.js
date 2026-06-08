@@ -37,7 +37,7 @@ const COURSE_CURRICULUM = {
   ]
 };
 
-export default function CoursesScreen({ user, onLogout, onNavigateToChat }) {
+export default function CoursesScreen({ user }) {
   const [selectedCourse, setSelectedCourse] = useState(user.courses[0] || "Graphic Design");
   const [currentVideo, setCurrentVideo] = useState(COURSE_CURRICULUM[selectedCourse]?.[0] || null);
 
@@ -51,21 +51,10 @@ export default function CoursesScreen({ user, onLogout, onNavigateToChat }) {
 
   return (
     <View style={styles.container}>
-      {/* Header bar */}
-      <View style={styles.header}>
-        <View style={styles.userInfo}>
-          <Text style={styles.userName}>Hello, {user.name || "Student"}</Text>
-          <Text style={styles.userStatus}>Enrolled: {user.courses.length} Program(s)</Text>
-        </View>
-        
-        <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.chatButton} onPress={onNavigateToChat}>
-            <Text style={styles.chatButtonText}>ASK DOUBTS</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.logoutButton} onPress={onLogout}>
-            <Text style={styles.logoutText}>LOGOUT</Text>
-          </TouchableOpacity>
-        </View>
+      {/* Screen Title */}
+      <View style={styles.titleContainer}>
+        <Text style={styles.screenTitle}>Curriculum Lectures</Text>
+        <Text style={styles.screenSubtitle}>Select and stream course videos</Text>
       </View>
 
       {/* Main video area */}
@@ -146,57 +135,22 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#050505',
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  titleContainer: {
     paddingHorizontal: 20,
-    paddingTop: 50,
+    paddingTop: 55,
     paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.05)',
   },
-  userInfo: {
-    flex: 1,
-  },
-  userName: {
-    fontSize: 16,
+  screenTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#fff',
   },
-  userStatus: {
-    fontSize: 10,
-    color: '#00f0ff',
-    fontWeight: '600',
+  screenSubtitle: {
+    fontSize: 11,
+    color: '#666',
     marginTop: 2,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  chatButton: {
-    backgroundColor: '#a855f7',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  chatButtonText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  logoutButton: {
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  logoutText: {
-    color: '#ef4444',
-    fontSize: 10,
-    fontWeight: '800',
   },
   videoPlayerContainer: {
     width: '100%',
