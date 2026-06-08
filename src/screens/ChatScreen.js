@@ -34,7 +34,7 @@ import {
   Volume2,
   X
 } from 'lucide-react-native';
-import { db, storage } from '../services/firebase';
+import { db, storage, APPS_SCRIPT_WEBHOOK } from '../services/firebase';
 import { 
   collection, 
   addDoc, 
@@ -46,6 +46,7 @@ import {
   setDoc
 } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import * as FileSystem from 'expo-file-system';
 
 export default function ChatScreen({ user, onBack }) {
   const [messages, setMessages] = useState([]);
@@ -373,9 +374,8 @@ export default function ChatScreen({ user, onBack }) {
           setUploadProgress(Math.round(progress));
         }, 
         (error) => {
-          console.warn("Firebase upload failed, simulating fallback upload:", error);
-          alert("Firebase Storage upload failed: " + error.message + "\nFalling back to local-only preview (Admin will not see the file). Please publish public Storage Rules in your Firebase console.");
-          simulateUpload(localUri, type, filename);
+          console.warn("Firebase Storage upload failed, trying Google Drive upload fallback:", error);
+          uploadToGoogleDrive(localUri, type, filename);
         }, 
         async () => {
           const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
@@ -393,8 +393,72 @@ export default function ChatScreen({ user, onBack }) {
         }
       );
     } catch (e) {
-      console.warn("Direct blob upload failed. Performing mock fallback simulation:", e);
-      alert("Direct blob upload failed: " + e.message + "\nPerforming mock fallback simulation.");
+      console.warn("Direct blob upload failed, trying Google Drive upload fallback:", e);
+      uploadToGoogleDrive(localUri, type, filename);
+    }
+  };
+
+  // 7b. Google Drive Webhook Upload Fallback (Allows 100% free media storage via Google Account)
+  const uploadToGoogleDrive = async (localUri, type, filename) => {
+    try {
+      setUploadProgress(15);
+      // Read the file as a base64 string
+      const base64Data = await FileSystem.readAsStringAsync(localUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      setUploadProgress(45);
+      
+      // Map basic MIME types based on type parameters
+      let mimeType = 'application/octet-stream';
+      if (type === 'image') mimeType = 'image/jpeg';
+      else if (type === 'audio') mimeType = 'audio/m4a';
+      else if (type === 'video') mimeType = 'video/mp4';
+      else if (type === 'document') {
+        if (filename.toLowerCase().endsWith('.pdf')) mimeType = 'application/pdf';
+        else if (filename.toLowerCase().endsWith('.png')) mimeType = 'image/png';
+        else if (filename.toLowerCase().endsWith('.jpg') || filename.toLowerCase().endsWith('.jpeg')) mimeType = 'image/jpeg';
+      }
+
+      const payload = {
+        action: 'upload_file',
+        fileName: filename,
+        mimeType: mimeType,
+        base64Data: base64Data
+      };
+
+      setUploadProgress(65);
+
+      const response = await fetch(APPS_SCRIPT_WEBHOOK, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
+      });
+
+      setUploadProgress(85);
+
+      const result = await response.json();
+      if (result && result.status === 'success' && result.fileUrl) {
+        setIsUploading(false);
+        setUploadProgress(0);
+
+        await saveMessage({
+          sender: user.email,
+          name: user.name,
+          fileUrl: result.fileUrl,
+          fileName: filename,
+          type: type,
+          timestamp: serverTimestamp() || new Date()
+        });
+      } else {
+        throw new Error(result.message || 'Server returned an invalid upload status');
+      }
+    } catch (err) {
+      console.warn("Google Drive upload failed, falling back to local simulation:", err);
+      // Warn user of fallback mode, but do not crash the chat flow
+      alert("Notice: Media upload failed (" + err.message + "). Falling back to local-only preview. Go to Firebase Console or configure your Webhook permissions.");
       simulateUpload(localUri, type, filename);
     }
   };
