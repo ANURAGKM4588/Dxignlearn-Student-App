@@ -374,6 +374,7 @@ export default function ChatScreen({ user, onBack }) {
         }, 
         (error) => {
           console.warn("Firebase upload failed, simulating fallback upload:", error);
+          alert("Firebase Storage upload failed: " + error.message + "\nFalling back to local-only preview (Admin will not see the file). Please publish public Storage Rules in your Firebase console.");
           simulateUpload(localUri, type, filename);
         }, 
         async () => {
@@ -393,6 +394,7 @@ export default function ChatScreen({ user, onBack }) {
       );
     } catch (e) {
       console.warn("Direct blob upload failed. Performing mock fallback simulation:", e);
+      alert("Direct blob upload failed: " + e.message + "\nPerforming mock fallback simulation.");
       simulateUpload(localUri, type, filename);
     }
   };
@@ -427,8 +429,22 @@ export default function ChatScreen({ user, onBack }) {
     }
   };
 
-  const formatTime = (seconds) => {
-    if (!seconds) return '';
+  const formatTime = (ts) => {
+    if (!ts) return '';
+    let seconds = 0;
+    if (typeof ts.seconds === 'number') {
+      seconds = ts.seconds;
+    } else if (ts instanceof Date) {
+      seconds = ts.getTime() / 1000;
+    } else if (typeof ts.toMillis === 'function') {
+      seconds = ts.toMillis() / 1000;
+    } else if (typeof ts === 'number') {
+      seconds = ts;
+    } else if (ts.seconds) {
+      seconds = Number(ts.seconds);
+    } else {
+      return '';
+    }
     const date = new Date(seconds * 1000);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
@@ -563,7 +579,7 @@ export default function ChatScreen({ user, onBack }) {
                 {/* Footer details inside the bubble */}
                 <View style={styles.bubbleFooter}>
                   <Text style={styles.messageTime}>
-                    {formatTime(item.timestamp?.seconds)}
+                    {formatTime(item.timestamp)}
                   </Text>
                   {isMe && (
                     <View style={styles.checkIcon}>
