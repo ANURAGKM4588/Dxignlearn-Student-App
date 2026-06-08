@@ -80,7 +80,7 @@ export async function verifyOTP(email, otp) {
     const fallbackUser = {
       email: normalizedEmail,
       name: "Test Student",
-      courses: ["UI/UX Design Masterclass", "Figma Advanced Secrets"]
+      courses: ["Graphic Design", "Film Making", "Content Creation", "Vibe Coding", "Business Automation"]
     };
     await AsyncStorage.setItem('user_session', JSON.stringify(fallbackUser));
     return { success: true, user: fallbackUser };
