@@ -13,27 +13,27 @@ import { Video, ResizeMode } from 'expo-av';
 // Simulated course curriculum structure
 const COURSE_CURRICULUM = {
   "Graphic Design": [
-    { id: "gd-1", title: "Introduction to generative AI design tools", duration: "18 mins", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" },
-    { id: "gd-2", title: "Midjourney prompts and composition mastery", duration: "25 mins", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4" },
-    { id: "gd-3", title: "Advanced generative fills & layout assets", duration: "32 mins", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4" }
+    { id: "gd-1", title: "CGI Ad Video - Tender Coconut", duration: "1 min", videoUrl: "https://dxignlearn.vercel.app/public/Images/videos/CGI%20Ad%20Video%20Tender%20coconut.mp4" },
+    { id: "gd-2", title: "Golden Tea Ad Commercial", duration: "1 min", videoUrl: "https://dxignlearn.vercel.app/public/Images/videos/Golden%20tea%20Ad.mp4" },
+    { id: "gd-3", title: "Jewllery Advertisement Showcase", duration: "1 min", videoUrl: "https://dxignlearn.vercel.app/public/Images/videos/Jewllery%20ads.mp4" }
   ],
   "Film Making": [
-    { id: "fm-1", title: "Cinematic camera path prompting in Runway", duration: "20 mins", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4" },
-    { id: "fm-2", title: "Consistent actor generation & video merging", duration: "28 mins", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4" },
-    { id: "fm-3", title: "Visual effects and multi-model editing pipelines", duration: "35 mins", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4" }
+    { id: "fm-1", title: "Cinematic Car Ads Project", duration: "1 min", videoUrl: "https://dxignlearn.vercel.app/public/Images/videos/Car%20Ads.mp4" },
+    { id: "fm-2", title: "Grandma's Sweet Storyboard Video", duration: "2 mins", videoUrl: "https://dxignlearn.vercel.app/public/Images/videos/Grandma%27s%20Sweet.mp4" },
+    { id: "fm-3", title: "Romantic Couple Short Cinematic", duration: "1 min", videoUrl: "https://dxignlearn.vercel.app/public/Images/videos/Romantic%20Couple%20Short%20video.mp4" }
   ],
   "Content Creation": [
-    { id: "cc-1", title: "Setting up chatGPT scripts & content calendars", duration: "15 mins", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4" },
-    { id: "cc-2", title: "Editing short-form vertical video hooks", duration: "22 mins", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4" },
-    { id: "cc-3", title: "Analytics tracking and virality optimization", duration: "19 mins", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4" }
+    { id: "cc-1", title: "KOME Reel - French Edition", duration: "1 min", videoUrl: "https://dxignlearn.vercel.app/public/Images/videos/KOME%20Reel%20-2%20French.mp4" },
+    { id: "cc-2", title: "Mayflower Reel 2 Project", duration: "1 min", videoUrl: "https://dxignlearn.vercel.app/public/Images/videos/Mayflower%20Reel%202.mp4" },
+    { id: "cc-3", title: "Regalia Brand Reel 1", duration: "1 min", videoUrl: "https://dxignlearn.vercel.app/public/Images/videos/Regalia%20reel%201.mp4" }
   ],
   "Vibe Coding": [
-    { id: "vc-1", title: "Building custom HTML components with Claude", duration: "24 mins", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4" },
-    { id: "vc-2", title: "Integrating APIs dynamically with natural language", duration: "31 mins", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" }
+    { id: "vc-1", title: "Reshma Website WebQ Reel", duration: "1 min", videoUrl: "https://dxignlearn.vercel.app/public/Images/videos/Reshma%20Website%20WebQ%20Reel%201.mp4" },
+    { id: "vc-2", title: "Velox Reel System Integration", duration: "2 mins", videoUrl: "https://dxignlearn.vercel.app/public/Images/videos/Velox%20Reel%201.mp4" }
   ],
   "Business Automation": [
-    { id: "ba-1", title: "Make.com workflow integrations & Zapier setup", duration: "30 mins", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4" },
-    { id: "ba-2", title: "Automating lead capturing and CRM database logs", duration: "27 mins", videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4" }
+    { id: "ba-1", title: "Sky Bound Travel Agency Automations", duration: "1 min", videoUrl: "https://dxignlearn.vercel.app/public/Images/videos/Sky%20Bound%20Traval%20Agency.mp4" },
+    { id: "ba-2", title: "OPTIC EXPO 2025 System Demo", duration: "1 min", videoUrl: "https://dxignlearn.vercel.app/public/Images/videos/OPTIC%20EXPO%202025,.mp4" }
   ]
 };
 
