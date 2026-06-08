@@ -41,7 +41,9 @@ import {
   query, 
   orderBy, 
   onSnapshot, 
-  serverTimestamp 
+  serverTimestamp,
+  doc,
+  setDoc
 } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
@@ -126,6 +128,21 @@ export default function ChatScreen({ user, onBack }) {
     };
   }, [currentSound]);
 
+  const [supportSettings, setSupportSettings] = useState({ isOnline: true, avgResponseTime: "4 mins" });
+
+  // Subscribe to Firebase support availability settings
+  useEffect(() => {
+    const docRef = doc(db, 'settings', 'support');
+    const unsubscribe = onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setSupportSettings(docSnap.data());
+      }
+    }, (error) => {
+      console.log("Firestore support settings listen skipped (offline/mock mode)");
+    });
+    return () => unsubscribe();
+  }, []);
+
   // 2. Send text message
   const handleSendText = async () => {
     if (!inputText.trim()) return;
@@ -146,7 +163,18 @@ export default function ChatScreen({ user, onBack }) {
   const saveMessage = async (msgData) => {
     try {
       const chatRoomId = user.email.replace(/[@.]/g, '_');
+      // 1. Add message to Firestore subcollection
       await addDoc(collection(db, 'chats', chatRoomId, 'messages'), msgData);
+      // 2. Sync metadata to parent registry document
+      await setDoc(doc(db, 'chats', chatRoomId), {
+        id: chatRoomId,
+        email: user.email,
+        name: user.name,
+        lastMessage: msgData.text || `[${msgData.type}]`,
+        lastActive: serverTimestamp() || { seconds: Date.now() / 1000 },
+        courses: user.courses || [],
+        unread: true
+      }, { merge: true });
     } catch (e) {
       console.warn("Saving to Firebase failed, appending to local state:", e);
       setMessages(prev => [...prev, { id: Math.random().toString(), ...msgData, timestamp: { seconds: Date.now() / 1000 } }]);
@@ -429,12 +457,14 @@ export default function ChatScreen({ user, onBack }) {
               source={{ uri: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?q=80&w=100&auto=format&fit=crop' }} 
               style={styles.avatar} 
             />
-            <View style={styles.statusDot} />
+            <View style={[styles.statusDot, { backgroundColor: supportSettings.isOnline ? '#10b981' : '#ef4444' }]} />
           </View>
 
           <View style={styles.headerTextContainer}>
             <Text style={styles.headerTitle} numberOfLines={1}>Anurag KM (Mentor)</Text>
-            <Text style={styles.headerStatus}>online support</Text>
+            <Text style={[styles.headerStatus, { color: supportSettings.isOnline ? '#10b981' : '#ef4444' }]}>
+              {supportSettings.isOnline ? 'online support' : 'offline support'}
+            </Text>
           </View>
         </View>
 

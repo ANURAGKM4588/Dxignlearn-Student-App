@@ -8,7 +8,8 @@ import {
   Dimensions 
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { COURSE_PAYMENT_LINKS, COURSE_PRICING } from '../services/firebase';
+import { COURSE_PAYMENT_LINKS, COURSE_PRICING, db } from '../services/firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
 
 const ALL_COURSES = ["Graphic Design", "Film Making", "Content Creation", "Vibe Coding", "Business Automation"];
 
@@ -31,6 +32,19 @@ const UPCOMING_COURSES = [
 
 export default function HomeScreen({ user, onNavigateToTab }) {
   const [notifiedCourses, setNotifiedCourses] = useState({});
+  const [supportSettings, setSupportSettings] = useState({ isOnline: true, avgResponseTime: "4 mins" });
+
+  useEffect(() => {
+    const docRef = doc(db, 'settings', 'support');
+    const unsubscribe = onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setSupportSettings(docSnap.data());
+      }
+    }, (error) => {
+      console.log("Firestore support settings listen skipped (offline/mock mode)");
+    });
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     async function loadNotifications() {
@@ -79,15 +93,29 @@ export default function HomeScreen({ user, onNavigateToTab }) {
         activeOpacity={0.85}
       >
         <View style={styles.mentorStatusHeader}>
-          <View style={styles.pulseContainer}>
-            <View style={styles.pulseCircle} />
-            <View style={styles.pulseIndicator} />
-          </View>
-          <Text style={styles.mentorStatusTitle}>MENTOR ONLINE SUPPORT</Text>
+          {supportSettings.isOnline ? (
+            <View style={styles.pulseContainer}>
+              <View style={styles.pulseCircle} />
+              <View style={styles.pulseIndicator} />
+            </View>
+          ) : (
+            <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#ef4444', marginRight: 8, marginTop: 1 }} />
+          )}
+          <Text style={[styles.mentorStatusTitle, !supportSettings.isOnline && { color: '#ef4444' }]}>
+            {supportSettings.isOnline ? 'MENTOR ONLINE SUPPORT' : 'MENTOR OFFLINE SUPPORT'}
+          </Text>
         </View>
-        <Text style={styles.mentorStatusText}>Stuck on a lesson? Anurag KM is available online to resolve your doubts right now.</Text>
+        <Text style={styles.mentorStatusText}>
+          {supportSettings.isOnline 
+            ? 'Stuck on a lesson? Anurag KM is available online to resolve your doubts right now.' 
+            : 'Mentor is currently offline. You can still leave your doubts; we will get back to you as soon as we return.'}
+        </Text>
         <View style={styles.mentorStatusFooter}>
-          <Text style={styles.avgResponseText}>Average response time: ~4 mins</Text>
+          <Text style={styles.avgResponseText}>
+            {supportSettings.isOnline 
+              ? `Average response time: ~${supportSettings.avgResponseTime || '4 mins'}` 
+              : 'Support currently offline'}
+          </Text>
           <Text style={styles.mentorStatusLinkText}>Start Chat →</Text>
         </View>
       </TouchableOpacity>
