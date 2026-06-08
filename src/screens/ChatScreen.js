@@ -279,36 +279,36 @@ export default function ChatScreen({ user, onBack }) {
                 
                 {/* Text Messages */}
                 {item.type === 'text' ? (
-                  <Text style={styles.messageText}>{item.text}</Text>
+                  <Text style={[styles.messageText, !isMe && styles.theirMessageText]}>{item.text}</Text>
                 ) : null}
-
+ 
                 {/* Image Messages */}
                 {item.type === 'image' ? (
                   <Image source={{ uri: item.fileUrl }} style={styles.attachmentImage} resizeMode="cover" />
                 ) : null}
-
+ 
                 {/* Video Messages */}
                 {item.type === 'video' ? (
-                  <TouchableOpacity style={styles.fileButton} onPress={() => handleDownloadFile(item.fileUrl)}>
-                    <Text style={styles.fileButtonText}>▶ PLAY VIDEO ATTACHMENT</Text>
+                  <TouchableOpacity style={[styles.fileButton, !isMe && styles.theirFileButton]} onPress={() => handleDownloadFile(item.fileUrl)}>
+                    <Text style={[styles.fileButtonText, !isMe && styles.theirFileButtonText]}>▶ PLAY VIDEO ATTACHMENT</Text>
                   </TouchableOpacity>
                 ) : null}
-
+ 
                 {/* Voice Notes */}
                 {item.type === 'audio' ? (
-                  <TouchableOpacity style={styles.fileButton} onPress={() => handleDownloadFile(item.fileUrl)}>
-                    <Text style={styles.fileButtonText}>🎙 PLAY VOICE NOTE</Text>
+                  <TouchableOpacity style={[styles.fileButton, !isMe && styles.theirFileButton]} onPress={() => handleDownloadFile(item.fileUrl)}>
+                    <Text style={[styles.fileButtonText, !isMe && styles.theirFileButtonText]}>🎙 PLAY VOICE NOTE</Text>
                   </TouchableOpacity>
                 ) : null}
-
+ 
                 {/* Documents */}
                 {item.type === 'document' ? (
-                  <TouchableOpacity style={styles.fileButton} onPress={() => handleDownloadFile(item.fileUrl)}>
-                    <Text style={styles.fileButtonText}>📄 DOCUMENT: {item.fileName}</Text>
+                  <TouchableOpacity style={[styles.fileButton, !isMe && styles.theirFileButton]} onPress={() => handleDownloadFile(item.fileUrl)}>
+                    <Text style={[styles.fileButtonText, !isMe && styles.theirFileButtonText]}>📄 DOCUMENT: {item.fileName}</Text>
                   </TouchableOpacity>
                 ) : null}
-
-                <Text style={styles.messageTime}>{formatTime(item.timestamp?.seconds)}</Text>
+ 
+                <Text style={[styles.messageTime, !isMe && styles.theirMessageTime]}>{formatTime(item.timestamp?.seconds)}</Text>
               </View>
             </View>
           );
@@ -439,14 +439,20 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   messageText: {
-    color: '#000',
+    color: '#050505',
     fontSize: 14,
+  },
+  theirMessageText: {
+    color: '#eee',
   },
   messageTime: {
     alignSelf: 'flex-end',
     fontSize: 8,
-    color: 'rgba(0,0,0,0.5)',
+    color: 'rgba(5,5,5,0.5)',
     marginTop: 4,
+  },
+  theirMessageTime: {
+    color: 'rgba(255,255,255,0.4)',
   },
   attachmentImage: {
     width: 200,
@@ -462,10 +468,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.1)',
   },
+  theirFileButton: {
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
   fileButtonText: {
-    color: '#000',
+    color: '#050505',
     fontSize: 11,
     fontWeight: 'bold',
+  },
+  theirFileButtonText: {
+    color: '#00f0ff',
   },
   uploadOverlay: {
     flexDirection: 'row',
