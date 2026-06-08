@@ -79,7 +79,7 @@ export default function ChatScreen({ user, onBack }) {
         { 
           id: "m1", 
           sender: "mentor", 
-          name: "Anurag KM",
+          name: "Anurag KM (Mentor)",
           text: "Welcome to Dxign.learn Doubt support! How can I help you today?", 
           type: 'text',
           timestamp: { seconds: Date.now() / 1000 - 3600 } 
@@ -152,7 +152,6 @@ export default function ChatScreen({ user, onBack }) {
         setRecordingDuration(prev => prev + 1);
       }, 1000);
 
-      // Feedback to indicate recording started
       if (Platform.OS !== 'web') {
         Vibration.vibrate(80);
       }
@@ -174,7 +173,6 @@ export default function ChatScreen({ user, onBack }) {
     const uri = recording.getURI();
     setRecording(null);
 
-    // Short vibration to indicate recording stopped
     if (Platform.OS !== 'web') {
       Vibration.vibrate(50);
     }
@@ -330,7 +328,7 @@ export default function ChatScreen({ user, onBack }) {
       style={styles.container}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 20}
     >
-      {/* 1. Header (WhatsApp-styled) */}
+      {/* 1. Header (Premium styled matching home UI) */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <TouchableOpacity style={styles.backButton} onPress={onBack}>
@@ -347,7 +345,7 @@ export default function ChatScreen({ user, onBack }) {
 
           <View style={styles.headerTextContainer}>
             <Text style={styles.headerTitle} numberOfLines={1}>Anurag KM (Mentor)</Text>
-            <Text style={styles.headerStatus}>online</Text>
+            <Text style={styles.headerStatus}>online support</Text>
           </View>
         </View>
 
@@ -356,7 +354,7 @@ export default function ChatScreen({ user, onBack }) {
             <Phone color="#00f0ff" size={18} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.headerIconButton}>
-            <MoreVertical color="#8696a0" size={18} />
+            <MoreVertical color="#888" size={18} />
           </TouchableOpacity>
         </View>
       </View>
@@ -391,7 +389,7 @@ export default function ChatScreen({ user, onBack }) {
                   {item.type === 'video' && (
                     <TouchableOpacity style={styles.mediaBlock} onPress={() => handleDownloadFile(item.fileUrl)}>
                       <View style={styles.mediaIconWrapper}>
-                        <Play color="#00f0ff" size={24} fill="#00f0ff" />
+                        <Play color="#00f0ff" size={20} fill="#00f0ff" />
                       </View>
                       <View style={styles.mediaDetails}>
                         <Text style={styles.mediaTitle} numberOfLines={1}>{item.fileName || 'Video Attachment'}</Text>
@@ -403,7 +401,7 @@ export default function ChatScreen({ user, onBack }) {
                   {item.type === 'audio' && (
                     <TouchableOpacity style={styles.mediaBlock} onPress={() => handleDownloadFile(item.fileUrl)}>
                       <View style={styles.mediaIconWrapper}>
-                        <Volume2 color="#00a884" size={24} />
+                        <Volume2 color="#00f0ff" size={20} />
                       </View>
                       <View style={styles.mediaDetails}>
                         <Text style={styles.mediaTitle} numberOfLines={1}>Voice Note</Text>
@@ -415,7 +413,7 @@ export default function ChatScreen({ user, onBack }) {
                   {item.type === 'document' && (
                     <TouchableOpacity style={styles.mediaBlock} onPress={() => handleDownloadFile(item.fileUrl)}>
                       <View style={styles.mediaIconWrapper}>
-                        <FileText color="#7f66ff" size={24} />
+                        <FileText color="#a855f7" size={20} />
                       </View>
                       <View style={styles.mediaDetails}>
                         <Text style={styles.mediaTitle} numberOfLines={1}>{item.fileName}</Text>
@@ -432,7 +430,7 @@ export default function ChatScreen({ user, onBack }) {
                   </Text>
                   {isMe && (
                     <View style={styles.checkIcon}>
-                      <CheckCheck color="#53bdeb" size={13} />
+                      <CheckCheck color="#00f0ff" size={12} />
                     </View>
                   )}
                 </View>
@@ -446,37 +444,37 @@ export default function ChatScreen({ user, onBack }) {
       {isUploading && (
         <View style={styles.uploadOverlay}>
           <ActivityIndicator color="#00f0ff" size="small" />
-          <Text style={styles.uploadText}>Sending Attachment ({uploadProgress}%)</Text>
+          <Text style={styles.uploadText}>Uploading Attachment ({uploadProgress}%)</Text>
         </View>
       )}
 
-      {/* 4. WhatsApp-styled Attachment Menu */}
+      {/* 4. WhatsApp-styled Attachment Menu with Frosted Glassmorphism */}
       {showAttachmentMenu && (
         <View style={styles.attachmentTray}>
           <TouchableOpacity style={styles.trayItem} onPress={pickDocument}>
-            <View style={[styles.trayIconWrapper, { backgroundColor: '#7f66ff' }]}>
-              <FileText color="#fff" size={20} />
+            <View style={[styles.trayIconWrapper, { backgroundColor: 'rgba(168, 85, 247, 0.15)', borderColor: '#a855f7', borderWidth: 1 }]}>
+              <FileText color="#a855f7" size={20} />
             </View>
             <Text style={styles.trayLabel}>Document</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.trayItem} onPress={() => pickMedia('video')}>
-            <View style={[styles.trayIconWrapper, { backgroundColor: '#ff9f43' }]}>
-              <VideoIcon color="#fff" size={20} />
+            <View style={[styles.trayIconWrapper, { backgroundColor: 'rgba(255, 159, 67, 0.15)', borderColor: '#ff9f43', borderWidth: 1 }]}>
+              <VideoIcon color="#ff9f43" size={20} />
             </View>
             <Text style={styles.trayLabel}>Video</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.trayItem} onPress={() => pickMedia('image')}>
-            <View style={[styles.trayIconWrapper, { backgroundColor: '#20c997' }]}>
-              <ImageIcon color="#fff" size={20} />
+            <View style={[styles.trayIconWrapper, { backgroundColor: 'rgba(0, 240, 255, 0.15)', borderColor: '#00f0ff', borderWidth: 1 }]}>
+              <ImageIcon color="#00f0ff" size={20} />
             </View>
             <Text style={styles.trayLabel}>Gallery</Text>
           </TouchableOpacity>
         </View>
       )}
 
-      {/* 5. Input Bar (WhatsApp-styled) */}
+      {/* 5. Input Bar (WhatsApp-structured, Glassmorphic style) */}
       <View style={styles.inputContainer}>
         {isRecording ? (
           /* Voice Recording Input Mode */
@@ -496,13 +494,13 @@ export default function ChatScreen({ user, onBack }) {
               style={styles.attachmentButton}
               onPress={() => setShowAttachmentMenu(!showAttachmentMenu)}
             >
-              <Paperclip color={showAttachmentMenu ? "#00f0ff" : "#8696a0"} size={20} />
+              <Paperclip color={showAttachmentMenu ? "#00f0ff" : "#888"} size={20} />
             </TouchableOpacity>
 
             <TextInput
               style={styles.input}
-              placeholder="Type your AI doubt here..."
-              placeholderTextColor="#8696a0"
+              placeholder="Type your doubt..."
+              placeholderTextColor="#555"
               value={inputText}
               onChangeText={(text) => {
                 setInputText(text);
@@ -516,18 +514,18 @@ export default function ChatScreen({ user, onBack }) {
         {/* Circular Action Trigger (Send or Record) */}
         {inputText.trim().length > 0 ? (
           <TouchableOpacity 
-            style={[styles.circularActionBtn, { backgroundColor: '#00a884' }]} 
+            style={[styles.circularActionBtn, { backgroundColor: '#00f0ff' }]} 
             onPress={handleSendText}
           >
-            <Send color="#fff" size={18} style={{ marginLeft: 2 }} />
+            <Send color="#050505" size={18} style={{ marginLeft: 2 }} />
           </TouchableOpacity>
         ) : (
           <TouchableOpacity 
-            style={[styles.circularActionBtn, isRecording ? styles.circularActionBtnRecording : { backgroundColor: '#00a884' }]} 
+            style={[styles.circularActionBtn, isRecording ? styles.circularActionBtnRecording : { backgroundColor: '#00f0ff' }]} 
             onLongPress={startRecording}
             onPressOut={stopRecording}
             delayLongPress={100}
-            activeOpacity={0.8}
+            activeOpacity={0.85}
             onPress={() => {
               if (Platform.OS !== 'web') {
                 Vibration.vibrate(40);
@@ -535,7 +533,7 @@ export default function ChatScreen({ user, onBack }) {
               alert("Hold to record a voice note.");
             }}
           >
-            <Mic color="#fff" size={18} />
+            <Mic color="#050505" size={18} />
           </TouchableOpacity>
         )}
       </View>
@@ -546,18 +544,18 @@ export default function ChatScreen({ user, onBack }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0b141a', // Classic WhatsApp dark mode background
+    backgroundColor: '#050505', // Deep Black matching home UI
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     paddingTop: Platform.OS === 'ios' ? 44 : 20,
-    paddingBottom: 10,
-    backgroundColor: '#1f2c34', // WhatsApp dark header color
-    borderBottomWidth: 0.5,
-    borderBottomColor: '#2f3b43',
+    paddingBottom: 12,
+    backgroundColor: '#0b0b0c', // Dark card background matching home UI
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
   },
   headerLeft: {
     flexDirection: 'row',
@@ -566,17 +564,19 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 6,
-    marginRight: 2,
+    marginRight: 4,
   },
   avatarContainer: {
     position: 'relative',
-    marginRight: 10,
+    marginRight: 12,
   },
   avatar: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#3f4f56',
+    backgroundColor: 'rgba(0, 240, 255, 0.1)',
+    borderWidth: 1.5,
+    borderColor: '#00f0ff',
   },
   statusDot: {
     position: 'absolute',
@@ -585,36 +585,37 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#00e676', // Online green
+    backgroundColor: '#10b981', // Online green matching home UI
     borderWidth: 1.5,
-    borderColor: '#1f2c34',
+    borderColor: '#0b0b0c',
   },
   headerTextContainer: {
     flex: 1,
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: 'bold',
-    color: '#e9edef',
+    color: '#fff',
   },
   headerStatus: {
-    fontSize: 11,
-    color: '#8696a0',
+    fontSize: 10,
+    color: '#10b981',
+    fontWeight: '600',
     marginTop: 1,
   },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 8,
   },
   headerIconButton: {
     padding: 8,
   },
   messageList: {
-    padding: 12,
-    paddingBottom: 20,
-    gap: 8,
+    padding: 16,
+    paddingBottom: 24,
+    gap: 12,
   },
   messageBubbleContainer: {
     width: '100%',
@@ -629,42 +630,52 @@ const styles = StyleSheet.create({
   },
   messageBubble: {
     maxWidth: '85%',
-    paddingHorizontal: 10,
-    paddingTop: 6,
-    paddingBottom: 4,
-    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 6,
+    borderRadius: 16,
     position: 'relative',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 1,
-    elevation: 1.5,
+    borderWidth: 1,
   },
   myBubble: {
-    backgroundColor: '#005c4b', // WhatsApp dark sent color
+    // Transparent Cyan liquid glass effect
+    backgroundColor: 'rgba(0, 240, 255, 0.08)',
+    borderColor: 'rgba(0, 240, 255, 0.25)',
     borderTopRightRadius: 2,
     alignSelf: 'flex-end',
+    shadowColor: '#00f0ff',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 3,
   },
   theirBubble: {
-    backgroundColor: '#202c33', // WhatsApp dark received color
+    // Transparent Purple liquid glass effect
+    backgroundColor: 'rgba(168, 85, 247, 0.08)',
+    borderColor: 'rgba(168, 85, 247, 0.2)',
     borderTopLeftRadius: 2,
     alignSelf: 'flex-start',
+    shadowColor: '#a855f7',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 3,
   },
   senderName: {
-    color: '#34b7f1',
-    fontSize: 11,
-    fontWeight: '700',
-    marginBottom: 3,
+    color: '#a855f7',
+    fontSize: 10,
+    fontWeight: 'bold',
+    marginBottom: 4,
   },
   bubbleContent: {
-    paddingRight: 50, // Space for inline time/status footer
+    paddingRight: 45, // Space for inline time & double-ticks
   },
   messageText: {
     fontSize: 14,
     lineHeight: 19,
   },
   myMessageText: {
-    color: '#e9edef',
+    color: '#fff',
   },
   theirMessageText: {
     color: '#e9edef',
@@ -675,40 +686,42 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 2,
     position: 'absolute',
-    bottom: 4,
+    bottom: 5,
     right: 8,
     gap: 3,
   },
   messageTime: {
     fontSize: 9,
-    color: '#8696a0',
+    color: '#888',
   },
   checkIcon: {
     justifyContent: 'center',
     alignItems: 'center',
   },
   attachmentImage: {
-    width: 230,
-    height: 170,
-    borderRadius: 8,
+    width: 220,
+    height: 160,
+    borderRadius: 10,
     marginBottom: 4,
     marginTop: 2,
   },
   mediaBlock: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.15)',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
     padding: 10,
-    borderRadius: 8,
+    borderRadius: 10,
     marginTop: 2,
     gap: 12,
-    width: 220,
+    width: 210,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
   },
   mediaIconWrapper: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -718,22 +731,22 @@ const styles = StyleSheet.create({
   mediaTitle: {
     fontSize: 12,
     fontWeight: 'bold',
-    color: '#e9edef',
+    color: '#fff',
   },
   mediaSubtitle: {
     fontSize: 10,
-    color: '#8696a0',
+    color: '#666',
     marginTop: 2,
   },
   uploadOverlay: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#1f2c34',
+    backgroundColor: '#0b0b0c',
     paddingVertical: 8,
     gap: 8,
-    borderTopWidth: 0.5,
-    borderTopColor: '#2f3b43',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.05)',
   },
   uploadText: {
     color: '#00f0ff',
@@ -743,20 +756,20 @@ const styles = StyleSheet.create({
   attachmentTray: {
     position: 'absolute',
     bottom: 72,
-    left: 12,
-    right: 12,
-    backgroundColor: '#1f2c34',
+    left: 16,
+    right: 16,
+    backgroundColor: 'rgba(11, 11, 12, 0.95)', // Frosted dark glassmorphic tray
     borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 240, 255, 0.15)',
     flexDirection: 'row',
     justifyContent: 'space-around',
     paddingVertical: 16,
-    borderWidth: 0.5,
-    borderColor: '#2f3b43',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
+    elevation: 6,
+    shadowColor: '#00f0ff',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
   },
   trayItem: {
     alignItems: 'center',
@@ -764,31 +777,33 @@ const styles = StyleSheet.create({
     width: 70,
   },
   trayIconWrapper: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 6,
   },
   trayLabel: {
     fontSize: 10,
-    color: '#e9edef',
+    color: '#fff',
     fontWeight: '500',
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    backgroundColor: '#0b141a', // WhatsApp background match
-    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: '#050505',
+    gap: 8,
   },
   inputBarWrapper: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1f2c34', // WhatsApp dark message wrapper
+    backgroundColor: 'rgba(255, 255, 255, 0.03)', // Frosted text input glass
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
     borderRadius: 24,
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -800,8 +815,8 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    color: '#e9edef',
-    fontSize: 15,
+    color: '#fff',
+    fontSize: 14,
     maxHeight: 100,
     paddingVertical: Platform.OS === 'ios' ? 6 : 2,
     textAlignVertical: 'center',
@@ -811,7 +826,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#1f2c34',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
     borderRadius: 24,
     paddingHorizontal: 16,
     height: 44,
@@ -847,9 +864,15 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#00f0ff',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 3,
   },
   circularActionBtnRecording: {
     backgroundColor: '#ef4444',
+    shadowColor: '#ef4444',
     transform: [{ scale: 1.15 }],
   }
 });
