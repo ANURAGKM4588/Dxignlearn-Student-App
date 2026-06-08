@@ -6,9 +6,13 @@ import {
   ScrollView, 
   TouchableOpacity, 
   Image, 
-  Dimensions 
+  Dimensions,
+  Linking
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { COURSE_PAYMENT_LINKS, COURSE_PRICING } from '../services/firebase';
+
+const ALL_COURSES = ["Graphic Design", "Film Making", "Content Creation", "Vibe Coding", "Business Automation"];
 
 const UPCOMING_COURSES = [
   {
@@ -150,6 +154,39 @@ export default function HomeScreen({ user, onNavigateToTab }) {
           </TouchableOpacity>
         ))}
       </View>
+
+      {/* Explore Catalog Section */}
+      {ALL_COURSES.some(c => !user.courses.includes(c)) && (
+        <View style={styles.catalogSection}>
+          <Text style={styles.sectionTitle}>Explore & Unlock Programs</Text>
+          <View style={styles.catalogList}>
+            {ALL_COURSES.filter(c => !user.courses.includes(c)).map((course) => (
+              <View key={course} style={styles.catalogCard}>
+                <View style={styles.catalogCardBody}>
+                  <Text style={styles.catalogCardTitle}>{course}</Text>
+                  <Text style={styles.catalogCardPrice}>
+                    Lifetime access: {COURSE_PRICING[course] || "₹499"}
+                  </Text>
+                  <Text style={styles.catalogCardBenefit}>
+                    {course === "Graphic Design" ? "✓ 3 Lectures • CGI Ad, Golden Tea, Jewelry Ads" : 
+                     course === "Film Making" ? "✓ 3 Lectures • Car Ads, Grandma Story, Cinematic Romantic" :
+                     course === "Content Creation" ? "✓ 3 Lectures • KOME Reel, Mayflower Reel, Regalia Brand" :
+                     course === "Vibe Coding" ? "✓ 2 Lectures • Reshma WebQ, Velox Integration" :
+                     "✓ 2 Lectures • Sky Bound Travel, Optic Expo 2025"}
+                  </Text>
+                </View>
+                <TouchableOpacity 
+                  style={styles.catalogBuyBtn}
+                  onPress={() => Linking.openURL(COURSE_PAYMENT_LINKS[course])}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.catalogBuyBtnText}>BUY NOW</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
 
       {/* Upcoming Courses Banner Section */}
       <Text style={styles.sectionTitleUpcoming}>Upcoming Programs & Webinars</Text>
@@ -488,5 +525,56 @@ const styles = StyleSheet.create({
   },
   notifyBtnTextActive: {
     color: '#10b981',
+  },
+  catalogSection: {
+    marginBottom: 28,
+  },
+  catalogList: {
+    gap: 12,
+    marginTop: 12,
+  },
+  catalogCard: {
+    flexDirection: 'row',
+    backgroundColor: '#0b0b0c',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+    padding: 16,
+    alignItems: 'center',
+  },
+  catalogCardBody: {
+    flex: 1,
+  },
+  catalogCardTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  catalogCardPrice: {
+    fontSize: 12,
+    color: '#00f0ff',
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  catalogCardBenefit: {
+    fontSize: 10,
+    color: '#666',
+  },
+  catalogBuyBtn: {
+    backgroundColor: '#a855f7',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    shadowColor: '#a855f7',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+  },
+  catalogBuyBtnText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   }
 });

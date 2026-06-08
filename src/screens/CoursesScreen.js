@@ -6,9 +6,13 @@ import {
   TouchableOpacity, 
   StyleSheet, 
   Dimensions, 
-  ScrollView 
+  ScrollView,
+  Linking
 } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
+import { COURSE_PAYMENT_LINKS, COURSE_PRICING } from '../services/firebase';
+
+const ALL_COURSES = ["Graphic Design", "Film Making", "Content Creation", "Vibe Coding", "Business Automation"];
 
 // Simulated course curriculum structure
 const COURSE_CURRICULUM = {
@@ -41,7 +45,14 @@ export default function CoursesScreen({ user }) {
   const [selectedCourse, setSelectedCourse] = useState(user.courses[0] || "Graphic Design");
   const [currentVideo, setCurrentVideo] = useState(COURSE_CURRICULUM[selectedCourse]?.[0] || null);
 
+  const isEnrolled = user.courses.includes(selectedCourse);
+
   const handleSelectVideo = (video) => {
+    if (!isEnrolled) {
+      alert(`Please purchase and unlock the ${selectedCourse} program to watch this lecture!`);
+      return;
+    }
+
     if (!video.videoUrl) {
       alert("This video module is locked or currently being uploaded. Check back soon!");
       return;
@@ -59,7 +70,20 @@ export default function CoursesScreen({ user }) {
 
       {/* Main video area */}
       <View style={styles.videoPlayerContainer}>
-        {currentVideo && currentVideo.videoUrl ? (
+        {!isEnrolled ? (
+          <View style={styles.lockedPlayerOverlay}>
+            <Text style={styles.lockedOverlayTitle}>🔒 COURSE LOCKED</Text>
+            <Text style={styles.lockedOverlayText}>You are not currently enrolled in the {selectedCourse} course.</Text>
+            <Text style={styles.lockedOverlayPrice}>Price: {COURSE_PRICING[selectedCourse] || "₹499"}</Text>
+            <TouchableOpacity 
+              style={styles.buyBtn} 
+              onPress={() => Linking.openURL(COURSE_PAYMENT_LINKS[selectedCourse])}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.buyBtnText}>BUY & UNLOCK NOW</Text>
+            </TouchableOpacity>
+          </View>
+        ) : currentVideo && currentVideo.videoUrl ? (
           <Video
             source={{ uri: currentVideo.videoUrl }}
             rate={1.0}
@@ -80,27 +104,30 @@ export default function CoursesScreen({ user }) {
       {/* Selected video details */}
       <View style={styles.videoDetails}>
         <Text style={styles.videoCategory}>{selectedCourse.toUpperCase()}</Text>
-        <Text style={styles.videoTitle}>{currentVideo ? currentVideo.title : "No lecture playing"}</Text>
-        <Text style={styles.videoDuration}>{currentVideo ? `Duration: ${currentVideo.duration}` : ""}</Text>
+        <Text style={styles.videoTitle}>{currentVideo && isEnrolled ? currentVideo.title : !isEnrolled ? "Access Blocked" : "No lecture playing"}</Text>
+        <Text style={styles.videoDuration}>{currentVideo && isEnrolled ? `Duration: ${currentVideo.duration}` : ""}</Text>
       </View>
 
       {/* Course selectors */}
       <View style={styles.courseTabs}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScroll}>
-          {user.courses.map((course) => (
-            <TouchableOpacity 
-              key={course}
-              style={[styles.tab, selectedCourse === course && styles.activeTab]}
-              onPress={() => {
-                setSelectedCourse(course);
-                setCurrentVideo(COURSE_CURRICULUM[course]?.[0] || null);
-              }}
-            >
-              <Text style={[styles.tabText, selectedCourse === course && styles.activeTabText]}>
-                {course}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          {ALL_COURSES.map((course) => {
+            const courseEnrolled = user.courses.includes(course);
+            return (
+              <TouchableOpacity 
+                key={course}
+                style={[styles.tab, selectedCourse === course && styles.activeTab]}
+                onPress={() => {
+                  setSelectedCourse(course);
+                  setCurrentVideo(COURSE_CURRICULUM[course]?.[0] || null);
+                }}
+              >
+                <Text style={[styles.tabText, selectedCourse === course && styles.activeTabText]}>
+                  {course} {!courseEnrolled && "🔒"}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </ScrollView>
       </View>
 
@@ -111,12 +138,12 @@ export default function CoursesScreen({ user }) {
         contentContainerStyle={styles.curriculumList}
         renderItem={({ item }) => (
           <TouchableOpacity 
-            style={[styles.lectureItem, currentVideo?.id === item.id && styles.activeLectureItem]}
+            style={[styles.lectureItem, currentVideo?.id === item.id && isEnrolled && styles.activeLectureItem]}
             onPress={() => handleSelectVideo(item)}
           >
             <View style={styles.lectureMeta}>
-              <View style={[styles.playIconCircle, !item.videoUrl && styles.lockedCircle]}>
-                <Text style={styles.playIcon}>{item.videoUrl ? "▶" : "🔒"}</Text>
+              <View style={[styles.playIconCircle, (!item.videoUrl || !isEnrolled) && styles.lockedCircle]}>
+                <Text style={styles.playIcon}>{(item.videoUrl && isEnrolled) ? "▶" : "🔒"}</Text>
               </View>
               <View style={styles.lectureTextContainer}>
                 <Text style={styles.lectureTitle} numberOfLines={1}>{item.title}</Text>
@@ -270,5 +297,46 @@ const styles = StyleSheet.create({
     color: '#555',
     fontSize: 10,
     marginTop: 2,
+  },
+  lockedPlayerOverlay: {
+    flex: 1,
+    backgroundColor: '#0b0b0c',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  lockedOverlayTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#ef4444',
+    letterSpacing: 2,
+    marginBottom: 8,
+  },
+  lockedOverlayText: {
+    fontSize: 12,
+    color: '#888',
+    textAlign: 'center',
+    marginBottom: 16,
+    lineHeight: 18,
+  },
+  lockedOverlayPrice: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#00f0ff',
+    marginBottom: 16,
+  },
+  buyBtn: {
+    backgroundColor: '#00f0ff',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  buyBtnText: {
+    color: '#050505',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1,
   }
 });

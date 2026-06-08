@@ -41,6 +41,24 @@ export const storage = getStorage(app);
 // Your Google Apps Script Webhook URL (used for Whitelist checking & sending free OTPs)
 const APPS_SCRIPT_WEBHOOK = "https://script.google.com/macros/s/AKfycbww2LgUDDxh7nSZy-fmAfeuTDBgPDjjY6xX66N2lmGoR1NCn6Vwx4RNd9WDYOliFyxq/exec";
 
+// Razorpay Payment Links for Courses (Replace these placeholders with your real Razorpay links)
+export const COURSE_PAYMENT_LINKS = {
+  "Graphic Design": "https://rzp.io/l/dxign-graphic-design",
+  "Film Making": "https://rzp.io/l/dxign-film-making",
+  "Content Creation": "https://rzp.io/l/dxign-content-creation",
+  "Vibe Coding": "https://rzp.io/l/dxign-vibe-coding",
+  "Business Automation": "https://rzp.io/l/dxign-business-automation"
+};
+
+// Course Pricing Details for UI Display
+export const COURSE_PRICING = {
+  "Graphic Design": "₹499",
+  "Film Making": "₹999",
+  "Content Creation": "₹399",
+  "Vibe Coding": "₹599",
+  "Business Automation": "₹799"
+};
+
 /**
  * Checks if email is registered on the website, and requests a free OTP email via Apps Script.
  */
