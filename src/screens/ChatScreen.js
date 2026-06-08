@@ -152,7 +152,7 @@ export default function ChatScreen({ user, onBack }) {
       name: user.name,
       text: inputText.trim(),
       type: 'text',
-      timestamp: serverTimestamp() || { seconds: Date.now() / 1000 }
+      timestamp: serverTimestamp() || new Date()
     };
 
     setInputText('');
@@ -171,13 +171,13 @@ export default function ChatScreen({ user, onBack }) {
         email: user.email,
         name: user.name,
         lastMessage: msgData.text || `[${msgData.type}]`,
-        lastActive: serverTimestamp() || { seconds: Date.now() / 1000 },
+        lastActive: serverTimestamp() || new Date(),
         courses: user.courses || [],
         unread: true
       }, { merge: true });
     } catch (e) {
       console.warn("Saving to Firebase failed, appending to local state:", e);
-      setMessages(prev => [...prev, { id: Math.random().toString(), ...msgData, timestamp: { seconds: Date.now() / 1000 } }]);
+      setMessages(prev => [...prev, { id: Math.random().toString(), ...msgData, timestamp: new Date() }]);
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     }
   };
@@ -387,7 +387,7 @@ export default function ChatScreen({ user, onBack }) {
             fileUrl: downloadUrl,
             fileName: filename,
             type: type,
-            timestamp: serverTimestamp() || { seconds: Date.now() / 1000 }
+            timestamp: serverTimestamp() || new Date()
           });
         }
       );
@@ -413,7 +413,7 @@ export default function ChatScreen({ user, onBack }) {
           fileUrl: localUri,
           fileName: filename,
           type: type,
-          timestamp: { seconds: Date.now() / 1000 }
+          timestamp: new Date()
         });
       }
     }, 250);
