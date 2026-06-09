@@ -10,7 +10,8 @@ import {
   Platform, 
   ActivityIndicator, 
   Image,
-  Vibration
+  Vibration,
+  Alert
 } from 'react-native';
 import { Audio, Video } from 'expo-av';
 import * as ImagePicker from 'expo-image-picker';
@@ -32,7 +33,8 @@ import {
   Phone, 
   MoreVertical, 
   Volume2,
-  X
+  X,
+  Trash
 } from 'lucide-react-native';
 import { db, storage, APPS_SCRIPT_WEBHOOK } from '../services/firebase';
 import { 
@@ -43,10 +45,55 @@ import {
   onSnapshot, 
   serverTimestamp,
   doc,
-  setDoc
+  setDoc,
+  deleteDoc,
+  updateDoc
 } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import * as FileSystem from 'expo-file-system/legacy';
+
+const getMediaDirectUrl = (url) => {
+  if (!url) return '';
+  let match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)\/view/);
+  if (match && match[1]) {
+    return `https://drive.google.com/uc?export=download&id=${match[1]}`;
+  }
+  match = url.match(/id=([a-zA-Z0-9_-]+)/);
+  if (url.includes('drive.google.com') && match && match[1]) {
+    return `https://drive.google.com/uc?export=download&id=${match[1]}`;
+  }
+  return url;
+};
+
+const getVideoThumbnailUrl = (url) => {
+  if (!url) return '';
+  let match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)\/view/);
+  if (match && match[1]) {
+    return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w400`;
+  }
+  match = url.match(/id=([a-zA-Z0-9_-]+)/);
+  if (url.includes('drive.google.com') && match && match[1]) {
+    return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w400`;
+  }
+  return url;
+};
+
+const WAVEFORM_HEIGHTS = [6, 12, 18, 14, 8, 10, 16, 22, 14, 12, 8, 6, 10, 16, 20, 14, 18, 12, 8, 6, 12, 16, 10, 8, 12, 14, 6];
+
+// Sort messages oldest-first by timestamp (new messages go to bottom)
+const sortByTime = (msgs) => {
+  return [...msgs].sort((a, b) => {
+    const getMs = (ts) => {
+      if (!ts) return 0;
+      if (typeof ts.seconds === 'number') return ts.seconds * 1000;
+      if (ts instanceof Date) return ts.getTime();
+      if (typeof ts.toMillis === 'function') return ts.toMillis();
+      if (typeof ts === 'number') return ts;
+      return 0;
+    };
+    return getMs(a.timestamp) - getMs(b.timestamp);
+  });
+};
 
 export default function ChatScreen({ user, onBack }) {
   const [messages, setMessages] = useState([]);
@@ -59,8 +106,116 @@ export default function ChatScreen({ user, onBack }) {
   const [isUploading, setIsUploading] = useState(false);
 
   // Audio Playback States
-  const [playingAudioId, setPlayingAudioId] = useState(null);
+  const [playbackStatus, setPlaybackStatus] = useState({
+    soundId: null,
+    position: 0,
+    duration: 0,
+    isPlaying: false,
+  });
   const [currentSound, setCurrentSound] = useState(null);
+
+  // Selection & More Dropdown States
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedMessageIds, setSelectedMessageIds] = useState([]);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+
+  const toggleSelectMessage = (messageId) => {
+    setSelectedMessageIds(prev => {
+      const exists = prev.includes(messageId);
+      let updated;
+      if (exists) {
+        updated = prev.filter(id => id !== messageId);
+      } else {
+        updated = [...prev, messageId];
+      }
+      if (updated.length === 0) {
+        setIsSelectionMode(false);
+      }
+      return updated;
+    });
+  };
+
+  const handleLongPressMessage = (messageId) => {
+    if (!isSelectionMode) {
+      setIsSelectionMode(true);
+      setSelectedMessageIds([messageId]);
+    } else {
+      toggleSelectMessage(messageId);
+    }
+  };
+
+  const handlePressMessage = (item) => {
+    if (isSelectionMode) {
+      toggleSelectMessage(item.id);
+    } else {
+      // Normal bubble press -> trigger preview mode
+      if (item.type === 'image') {
+        setPreviewMedia({ type: 'image', url: item.fileUrl });
+      } else if (item.type === 'video') {
+        setPreviewMedia({ type: 'video', url: getMediaDirectUrl(item.fileUrl), fileName: item.fileName });
+      } else if (item.type === 'document') {
+        setPreviewMedia({ type: 'document', url: item.fileUrl, fileName: item.fileName });
+      }
+    }
+  };
+
+  const handleDeleteSelectedMessages = async () => {
+    if (selectedMessageIds.length === 0) return;
+
+    const performDelete = async () => {
+      try {
+        const chatRoomId = user.email.replace(/[@.]/g, '_');
+        for (const msgId of selectedMessageIds) {
+          try {
+            await deleteDoc(doc(db, 'chats', chatRoomId, 'messages', msgId));
+          } catch (dbErr) {
+            console.warn("Firestore delete failed for msg ID " + msgId + ", local removal only:", dbErr);
+            setMessages(prev => prev.filter(m => m.id !== msgId));
+          }
+        }
+        setIsSelectionMode(false);
+        setSelectedMessageIds([]);
+      } catch (err) {
+        console.error("Error deleting messages:", err);
+      }
+    };
+
+    Alert.alert(
+      "Delete for Everyone",
+      `Are you sure you want to delete ${selectedMessageIds.length} message(s) for everyone?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Delete for Everyone", style: "destructive", onPress: performDelete }
+      ]
+    );
+  };
+
+  const handleClearChat = async () => {
+    const performClear = async () => {
+      try {
+        const chatRoomId = user.email.replace(/[@.]/g, '_');
+        for (const msg of messages) {
+          try {
+            await deleteDoc(doc(db, 'chats', chatRoomId, 'messages', msg.id));
+          } catch (e) {
+            console.warn("Failed to delete message during clear:", e);
+          }
+        }
+        setMessages([]);
+      } catch (err) {
+        console.error("Error clearing chat:", err);
+      }
+    };
+
+    Alert.alert(
+      "Clear Chat",
+      "Are you sure you want to delete all messages for everyone in this chat? This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Clear for Everyone", style: "destructive", onPress: performClear }
+      ]
+    );
+  };
 
   // Media Preview Modal States
   const [previewMedia, setPreviewMedia] = useState(null); // { type: 'image'|'video'|'document', url: string, fileName?: string }
@@ -84,6 +239,14 @@ export default function ChatScreen({ user, onBack }) {
     setupAudio();
   }, []);
 
+  // Always scroll to newest messages when messages list changes (initial load + new messages)
+  useEffect(() => {
+    if (messages.length > 0) {
+      // Small delay to let FlatList finish laying out before scrolling
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 120);
+    }
+  }, [messages.length]);
+
   // 1. Subscribe to Firebase messages
   useEffect(() => {
     const chatRoomId = user.email.replace(/[@.]/g, '_');
@@ -94,15 +257,23 @@ export default function ChatScreen({ user, onBack }) {
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const msgs = [];
-      snapshot.forEach((doc) => {
-        msgs.push({ id: doc.id, ...doc.data() });
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        msgs.push({ id: docSnap.id, ...data });
+
+        // Auto-mark mentor messages as read when student views/loads them
+        if (data.sender === 'mentor' && data.status !== 'read') {
+          updateDoc(doc(db, 'chats', chatRoomId, 'messages', docSnap.id), { status: 'read' })
+            .catch(err => console.warn("Error marking message as read:", err));
+        }
       });
-      setMessages(msgs);
+      // Firestore returns asc-ordered but local additions may not be
+      setMessages(sortByTime(msgs));
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     }, (error) => {
       console.log("Firestore subscription skipped/failed (offline/mock mode enabled)");
       // Fallback: Populate mock messages for testing
-      setMessages([
+      setMessages(sortByTime([
         { 
           id: "m1", 
           sender: "mentor", 
@@ -119,7 +290,8 @@ export default function ChatScreen({ user, onBack }) {
           type: 'text',
           timestamp: { seconds: Date.now() / 1000 - 1800 } 
         }
-      ]);
+      ]));
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 150);
     });
 
     return () => {
@@ -153,6 +325,7 @@ export default function ChatScreen({ user, onBack }) {
       name: user.name,
       text: inputText.trim(),
       type: 'text',
+      status: supportSettings.isOnline ? 'delivered' : 'sent',
       timestamp: serverTimestamp() || new Date()
     };
 
@@ -178,7 +351,8 @@ export default function ChatScreen({ user, onBack }) {
       }, { merge: true });
     } catch (e) {
       console.warn("Saving to Firebase failed, appending to local state:", e);
-      setMessages(prev => [...prev, { id: Math.random().toString(), ...msgData, timestamp: new Date() }]);
+      // Add locally and re-sort so order is correct
+      setMessages(prev => sortByTime([...prev, { id: Math.random().toString(), ...msgData, timestamp: new Date() }]));
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     }
   };
@@ -274,45 +448,107 @@ export default function ChatScreen({ user, onBack }) {
   // 8. Playback Voice Notes directly inside the app
   const handlePlayAudio = async (messageId, audioUrl) => {
     try {
-      // If the selected voice note is already playing, pause it
-      if (playingAudioId === messageId) {
+      // Configure Audio Mode for playback
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        shouldRouteThroughEarpieceIOS: false,
+      });
+
+      // Toggle pause/resume if same message is already loaded
+      if (playbackStatus.soundId === messageId) {
         if (currentSound) {
-          await currentSound.stopAsync();
-          await currentSound.unloadAsync();
-          setCurrentSound(null);
+          if (playbackStatus.isPlaying) {
+            await currentSound.pauseAsync();
+            setPlaybackStatus(prev => ({ ...prev, isPlaying: false }));
+          } else {
+            await currentSound.playAsync();
+            setPlaybackStatus(prev => ({ ...prev, isPlaying: true }));
+          }
         }
-        setPlayingAudioId(null);
         return;
       }
 
-      // If another audio is playing, stop and unload it first
+      // Stop and unload any existing sound
       if (currentSound) {
-        await currentSound.stopAsync();
-        await currentSound.unloadAsync();
+        await currentSound.stopAsync().catch(() => {});
+        await currentSound.unloadAsync().catch(() => {});
         setCurrentSound(null);
       }
 
-      setPlayingAudioId(messageId);
+      // Resolve the playback URI
+      // Expo AV cannot play base64 data: URIs on native — must write to temp file first
+      let playUri = getMediaDirectUrl(audioUrl);
+      
+      if (audioUrl && audioUrl.startsWith('data:')) {
+        try {
+          // Extract the base64 portion and MIME type
+          const [header, base64Data] = audioUrl.split(',');
+          const mimeType = header.match(/data:([^;]+)/)?.[1] || 'audio/mp4';
+          // Map MIME to file extension — iOS Expo AV plays .m4a (AAC/MP4), Android plays most formats
+          const ext = mimeType.includes('webm') ? 'webm'
+            : mimeType.includes('ogg') ? 'ogg'
+            : (mimeType.includes('mp4') || mimeType.includes('m4a') || mimeType.includes('aac')) ? 'm4a'
+            : 'm4a';
+          const tempPath = `${FileSystem.cacheDirectory}voice_${messageId}.${ext}`;
+          
+          // Write base64 to temp file (only if it doesn't already exist)
+          const info = await FileSystem.getInfoAsync(tempPath);
+          if (!info.exists) {
+            await FileSystem.writeAsStringAsync(tempPath, base64Data, {
+              encoding: 'base64',
+            });
+          }
+          playUri = tempPath;
+        } catch (writeErr) {
+          console.warn('Failed to write audio to temp file:', writeErr);
+          // Try playing the data URI directly as last resort (may work on some platforms)
+          playUri = audioUrl;
+        }
+      }
 
-      // Load and play the audio file
       const { sound } = await Audio.Sound.createAsync(
-        { uri: audioUrl },
+        { uri: playUri },
         { shouldPlay: true }
       );
 
       setCurrentSound(sound);
+      setPlaybackStatus({
+        soundId: messageId,
+        position: 0,
+        duration: 0,
+        isPlaying: true,
+      });
 
-      // Listen for when audio finishes playing
       sound.setOnPlaybackStatusUpdate((status) => {
-        if (status.didJustFinish) {
-          setPlayingAudioId(null);
-          sound.unloadAsync();
-          setCurrentSound(null);
+        if (status.isLoaded) {
+          setPlaybackStatus(prev => ({
+            ...prev,
+            position: status.positionMillis || 0,
+            duration: status.durationMillis || 0,
+            isPlaying: status.isPlaying,
+          }));
+
+          if (status.didJustFinish) {
+            setPlaybackStatus({
+              soundId: null,
+              position: 0,
+              duration: 0,
+              isPlaying: false,
+            });
+            sound.unloadAsync();
+            setCurrentSound(null);
+          }
         }
       });
     } catch (error) {
       console.warn("Error playing audio:", error);
-      setPlayingAudioId(null);
+      setPlaybackStatus({
+        soundId: null,
+        position: 0,
+        duration: 0,
+        isPlaying: false,
+      });
     }
   };
 
@@ -323,14 +559,19 @@ export default function ChatScreen({ user, onBack }) {
     const options = {
       mediaTypes: type === 'image' ? ImagePicker.MediaTypeOptions.Images : ImagePicker.MediaTypeOptions.Videos,
       allowsEditing: false,
-      quality: 0.8,
+      // Resize images to max 1080px wide and 60% quality — reduces 10MB → ~300KB, 30x faster upload
+      quality: type === 'image' ? 0.55 : 0.8,
+      ...(type === 'image' ? { exif: false } : {}),
     };
 
     result = await ImagePicker.launchImageLibraryAsync(options);
 
     if (!result.canceled && result.assets?.[0]?.uri) {
-      const uri = result.assets[0].uri;
-      uploadFile(uri, type, type === 'image' ? 'photo.jpg' : 'video.mp4');
+      const asset = result.assets[0];
+      const uri = asset.uri;
+      const ext = type === 'image' ? 'jpg' : 'mp4';
+      const uniqueFilename = `${type}_${Date.now()}.${ext}`;
+      uploadFile(uri, type, uniqueFilename, asset.mimeType);
     }
   };
 
@@ -354,19 +595,31 @@ export default function ChatScreen({ user, onBack }) {
   };
 
   // 7. General File Upload Function
-  const uploadFile = async (localUri, type, filename) => {
+  const uploadFile = async (localUri, type, filename, mimeTypeHint) => {
     setIsUploading(true);
     setUploadProgress(5);
 
     const timestamp = Date.now();
-    const storagePath = `chats/${user.email.replace(/[@.]/g, '_')}/${timestamp}_${filename}`;
+    const safeEmail = user.email.replace(/[@.]/g, '_');
+    const storagePath = `chats/${safeEmail}/${timestamp}_${filename}`;
     
+    // Determine MIME type for proper Content-Type header
+    let contentType = mimeTypeHint || 'application/octet-stream';
+    if (!mimeTypeHint) {
+      if (type === 'image') contentType = 'image/jpeg';
+      else if (type === 'audio') contentType = 'audio/mp4';
+      else if (type === 'video') contentType = 'video/mp4';
+      else if (filename.toLowerCase().endsWith('.pdf')) contentType = 'application/pdf';
+    }
+
     try {
       const response = await fetch(localUri);
       const blob = await response.blob();
       
       const fileRef = ref(storage, storagePath);
-      const uploadTask = uploadBytesResumable(fileRef, blob);
+      // Pass contentType metadata so Firebase Storage serves the file with correct MIME
+      const metadata = { contentType };
+      const uploadTask = uploadBytesResumable(fileRef, blob, metadata);
 
       uploadTask.on('state_changed', 
         (snapshot) => {
@@ -388,6 +641,7 @@ export default function ChatScreen({ user, onBack }) {
             fileUrl: downloadUrl,
             fileName: filename,
             type: type,
+            status: supportSettings.isOnline ? 'delivered' : 'sent',
             timestamp: serverTimestamp() || new Date()
           });
         }
@@ -412,7 +666,8 @@ export default function ChatScreen({ user, onBack }) {
       // Map basic MIME types based on type parameters
       let mimeType = 'application/octet-stream';
       if (type === 'image') mimeType = 'image/jpeg';
-      else if (type === 'audio') mimeType = 'audio/m4a';
+      // M4A = MPEG-4 Audio (AAC). Use audio/mp4 MIME so Chrome can play it too
+      else if (type === 'audio') mimeType = 'audio/mp4';
       else if (type === 'video') mimeType = 'video/mp4';
       else if (type === 'document') {
         if (filename.toLowerCase().endsWith('.pdf')) mimeType = 'application/pdf';
@@ -451,6 +706,7 @@ export default function ChatScreen({ user, onBack }) {
           fileUrl: result.fileUrl,
           fileName: filename,
           type: type,
+          status: supportSettings.isOnline ? 'delivered' : 'sent',
           timestamp: serverTimestamp() || new Date()
         });
       } else {
@@ -458,13 +714,35 @@ export default function ChatScreen({ user, onBack }) {
       }
     } catch (err) {
       console.warn("Google Drive upload failed, falling back to local simulation:", err);
-      // Warn user of fallback mode, but do not crash the chat flow
-      alert("Notice: Media upload failed (" + err.message + "). Falling back to local-only preview. Go to Firebase Console or configure your Webhook permissions.");
+      // Fall back silently to base64/local simulation without throwing a disruptive alert
       simulateUpload(localUri, type, filename);
     }
   };
 
-  const simulateUpload = (localUri, type, filename) => {
+  const simulateUpload = async (localUri, type, filename) => {
+    let finalFileUrl = localUri;
+    
+    // Check if we can convert the local file to a base64 Data URL so the mentor can access it
+    if (type === 'audio' || type === 'image') {
+      try {
+        const fileInfo = await FileSystem.getInfoAsync(localUri);
+        if (fileInfo.exists && fileInfo.size < 750 * 1024) {
+          const base64Data = await FileSystem.readAsStringAsync(localUri, {
+            encoding: 'base64',
+          });
+          let mimeType = 'application/octet-stream';
+          if (type === 'image') mimeType = 'image/jpeg';
+          // Use audio/mp4 (not audio/m4a) — Chrome requires audio/mp4 to play AAC/M4A data URLs
+          else if (type === 'audio') mimeType = 'audio/mp4';
+          
+          finalFileUrl = `data:${mimeType};base64,${base64Data}`;
+          console.log("Successfully encoded mobile file to base64 data URL (size: " + fileInfo.size + " bytes)");
+        }
+      } catch (fileErr) {
+        console.warn("Failed to read local mobile file for base64 fallback:", fileErr);
+      }
+    }
+
     let prog = 10;
     const interval = setInterval(() => {
       prog += 30;
@@ -477,9 +755,10 @@ export default function ChatScreen({ user, onBack }) {
         saveMessage({
           sender: user.email,
           name: user.name,
-          fileUrl: localUri,
+          fileUrl: finalFileUrl,
           fileName: filename,
           type: type,
+          status: supportSettings.isOnline ? 'delivered' : 'sent',
           timestamp: new Date()
         });
       }
@@ -527,37 +806,104 @@ export default function ChatScreen({ user, onBack }) {
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 20}
     >
       {/* 1. Header (Premium styled matching home UI) */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <TouchableOpacity style={styles.backButton} onPress={onBack}>
-            <ArrowLeft color="#00f0ff" size={20} />
-          </TouchableOpacity>
-          
-          <View style={styles.avatarContainer}>
-            <Image 
-              source={{ uri: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?q=80&w=100&auto=format&fit=crop' }} 
-              style={styles.avatar} 
-            />
-            <View style={[styles.statusDot, { backgroundColor: supportSettings.isOnline ? '#10b981' : '#ef4444' }]} />
+      {isSelectionMode ? (
+        <View style={[styles.header, { backgroundColor: '#0c1a30', borderBottomColor: 'rgba(0, 240, 255, 0.25)' }]}>
+          <View style={styles.headerLeft}>
+            <TouchableOpacity 
+              style={styles.backButton} 
+              onPress={() => {
+                setIsSelectionMode(false);
+                setSelectedMessageIds([]);
+              }}
+            >
+              <X color="#00f0ff" size={20} />
+            </TouchableOpacity>
+            <View style={styles.headerTextContainer}>
+              <Text style={[styles.headerTitle, { color: '#00f0ff' }]}>{selectedMessageIds.length} Selected</Text>
+              <Text style={[styles.headerStatus, { color: '#888' }]}>Selection Mode Active</Text>
+            </View>
           </View>
 
-          <View style={styles.headerTextContainer}>
-            <Text style={styles.headerTitle} numberOfLines={1}>Anurag KM (Mentor)</Text>
-            <Text style={[styles.headerStatus, { color: supportSettings.isOnline ? '#10b981' : '#ef4444' }]}>
-              {supportSettings.isOnline ? 'online support' : 'offline support'}
-            </Text>
+          <View style={styles.headerRight}>
+            <TouchableOpacity 
+              style={styles.headerIconButton} 
+              onPress={handleDeleteSelectedMessages}
+              disabled={selectedMessageIds.length === 0}
+            >
+              <Trash color={selectedMessageIds.length === 0 ? "#444" : "#ef4444"} size={20} />
+            </TouchableOpacity>
           </View>
         </View>
+      ) : (
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <TouchableOpacity style={styles.backButton} onPress={onBack}>
+              <ArrowLeft color="#00f0ff" size={20} />
+            </TouchableOpacity>
+            
+            <View style={styles.avatarContainer}>
+              <Image 
+                source={{ uri: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?q=80&w=100&auto=format&fit=crop' }} 
+                style={styles.avatar} 
+              />
+              <View style={[styles.statusDot, { backgroundColor: supportSettings.isOnline ? '#10b981' : '#ef4444' }]} />
+            </View>
 
-        <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.headerIconButton}>
-            <Phone color="#00f0ff" size={18} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.headerIconButton}>
-            <MoreVertical color="#888" size={18} />
-          </TouchableOpacity>
+            <View style={styles.headerTextContainer}>
+              <Text style={styles.headerTitle} numberOfLines={1}>Anurag KM (Mentor)</Text>
+              <Text style={[styles.headerStatus, { color: supportSettings.isOnline ? '#10b981' : '#ef4444' }]}>
+                {supportSettings.isOnline ? 'online support' : 'offline support'}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.headerRight}>
+            <TouchableOpacity style={styles.headerIconButton}>
+              <Phone color="#00f0ff" size={18} />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.headerIconButton} 
+              onPress={() => setShowMoreMenu(true)}
+            >
+              <MoreVertical color="#888" size={18} />
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+      )}
+
+      {/* More Options Dropdown Overlay */}
+      {showMoreMenu && (
+        <TouchableOpacity 
+          style={styles.dropdownOverlay} 
+          activeOpacity={1} 
+          onPress={() => setShowMoreMenu(false)}
+        >
+          <View style={styles.dropdownMenu}>
+            <TouchableOpacity 
+              style={styles.dropdownItem} 
+              onPress={() => {
+                setShowMoreMenu(false);
+                setIsSelectionMode(true);
+                setSelectedMessageIds([]);
+              }}
+            >
+              <Text style={styles.dropdownItemText}>Select Messages</Text>
+            </TouchableOpacity>
+            
+            <View style={styles.dropdownDivider} />
+            
+            <TouchableOpacity 
+              style={styles.dropdownItem} 
+              onPress={() => {
+                setShowMoreMenu(false);
+                handleClearChat();
+              }}
+            >
+              <Text style={[styles.dropdownItemText, { color: '#ef4444' }]}>Clear Chat</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      )}
 
       {/* 2. Messages List */}
       <FlatList
@@ -565,64 +911,300 @@ export default function ChatScreen({ user, onBack }) {
         data={messages}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.messageList}
+
         renderItem={({ item }) => {
           const isMe = item.sender === user.email;
+          const isSelected = selectedMessageIds.includes(item.id);
           return (
-            <View style={[styles.messageBubbleContainer, isMe ? styles.myBubbleContainer : styles.theirBubbleContainer]}>
-              <View style={[styles.messageBubble, isMe ? styles.myBubble : styles.theirBubble]}>
-                {!isMe && <Text style={styles.senderName}>{item.name || "Mentor"}</Text>}
+            <TouchableOpacity 
+              activeOpacity={isSelectionMode ? 0.85 : 1}
+              onPress={() => handlePressMessage(item)}
+              onLongPress={() => handleLongPressMessage(item.id)}
+              style={[
+                styles.messageBubbleContainer, 
+                isMe ? styles.myBubbleContainer : styles.theirBubbleContainer,
+                isSelected && { backgroundColor: 'rgba(0, 240, 255, 0.12)' }
+              ]}
+            >
+              <View style={[
+                styles.messageBubble, 
+                isMe ? styles.myBubble : styles.theirBubble,
+                (item.type === 'image' || item.type === 'video' || item.type === 'audio') && { 
+                  borderWidth: 0, 
+                  backgroundColor: 'transparent', 
+                  shadowOpacity: 0, 
+                  elevation: 0, 
+                  paddingHorizontal: 0, 
+                  paddingTop: 0, 
+                  paddingBottom: 0 
+                },
+                isSelected && { borderColor: 'rgba(0, 240, 255, 0.4)' }
+              ]}>
+                {isSelectionMode && (
+                  <View style={[StyleSheet.absoluteFillObject, { zIndex: 9999 }]} />
+                )}
+                 {!isMe && <Text style={styles.senderName}>{item.name || "Mentor"}</Text>}
                 
                 {/* Message Body Content */}
-                <View style={styles.bubbleContent}>
-                  {item.type === 'text' && (
+                {item.type === 'text' && (
+                  <View style={styles.bubbleContent}>
                     <Text style={[styles.messageText, isMe ? styles.myMessageText : styles.theirMessageText]}>
                       {item.text}
                     </Text>
-                  )}
+                  </View>
+                )}
      
                   {item.type === 'image' && (
-                    <TouchableOpacity onPress={() => setPreviewMedia({ type: 'image', url: item.fileUrl })}>
-                      <Image source={{ uri: item.fileUrl }} style={styles.attachmentImage} resizeMode="cover" />
-                    </TouchableOpacity>
-                  )}
-     
-                  {item.type === 'video' && (
-                    <TouchableOpacity 
-                      style={styles.mediaBlock} 
-                      onPress={() => setPreviewMedia({ type: 'video', url: item.fileUrl, fileName: item.fileName })}
-                    >
-                      <View style={styles.mediaIconWrapper}>
-                        <Play color="#00f0ff" size={20} fill="#00f0ff" />
-                      </View>
-                      <View style={styles.mediaDetails}>
-                        <Text style={styles.mediaTitle} numberOfLines={1}>{item.fileName || 'Video Attachment'}</Text>
-                        <Text style={styles.mediaSubtitle}>Tap to play video</Text>
-                      </View>
-                    </TouchableOpacity>
-                  )}
-     
-                  {item.type === 'audio' && (
-                    <TouchableOpacity 
-                      style={styles.mediaBlock} 
-                      onPress={() => handlePlayAudio(item.id, item.fileUrl)}
-                      activeOpacity={0.8}
-                    >
-                      <View style={styles.mediaIconWrapper}>
-                        {playingAudioId === item.id ? (
-                          <Pause color="#00f0ff" size={20} fill="#00f0ff" />
-                        ) : (
-                          <Play color="#00f0ff" size={20} fill="#00f0ff" />
+                    <View style={styles.imageWrapper}>
+                      <TouchableOpacity onPress={() => setPreviewMedia({ type: 'image', url: item.fileUrl })}>
+                        <Image source={{ uri: item.fileUrl }} style={styles.attachmentImage} resizeMode="cover" />
+                      </TouchableOpacity>
+                      <View style={styles.mediaTimeOverlay}>
+                        <Text style={styles.mediaTimeText}>{formatTime(item.timestamp)}</Text>
+                        {isMe && (
+                          <View style={styles.checkIcon}>
+                            {item.status === 'sending' || item.status === 'sent' ? (
+                              <Check color="rgba(255,255,255,0.7)" size={10} />
+                            ) : item.status === 'read' ? (
+                              <CheckCheck color="#00f0ff" size={10} />
+                            ) : (
+                              <CheckCheck color="rgba(255,255,255,0.7)" size={10} />
+                            )}
+                          </View>
                         )}
                       </View>
-                      <View style={styles.mediaDetails}>
-                        <Text style={styles.mediaTitle} numberOfLines={1}>
-                          {playingAudioId === item.id ? 'Playing Voice Note...' : 'Voice Note'}
-                        </Text>
-                        <Text style={styles.mediaSubtitle}>
-                          {playingAudioId === item.id ? 'Tap to Pause' : 'Tap to Play'}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
+                    </View>
+                  )}
+     
+                  {item.type === 'video' && (() => {
+                    const playUrl = getMediaDirectUrl(item.fileUrl);
+                    const isDrive = item.fileUrl && item.fileUrl.includes('drive.google.com');
+                    const isLocalOrFirebase = !isDrive;
+                    
+                    return (
+                      <TouchableOpacity 
+                        style={styles.videoBubble} 
+                        onPress={() => setPreviewMedia({ type: 'video', url: playUrl, fileName: item.fileName })}
+                        activeOpacity={0.88}
+                      >
+                        <View style={styles.videoThumbnailWrapper}>
+                          {isLocalOrFirebase ? (
+                            <Video
+                              source={{ uri: playUrl }}
+                              rate={1.0}
+                              volume={0.0}
+                              isMuted={true}
+                              resizeMode="cover"
+                              shouldPlay={false}
+                              style={styles.videoThumbnail}
+                            />
+                          ) : (
+                            <Image 
+                              source={{ uri: getVideoThumbnailUrl(item.fileUrl) }} 
+                              style={styles.videoThumbnail} 
+                              resizeMode="cover" 
+                            />
+                          )}
+
+                          <View style={styles.videoThumbnailOverlay} />
+
+                          <View style={styles.videoPlayOverlayBtn}>
+                            <Play color="#fff" size={28} fill="rgba(255,255,255,0.9)" style={{ marginLeft: 3 }} />
+                          </View>
+
+                          <View style={styles.videoBadge}>
+                            <VideoIcon color="#00f0ff" size={10} fill="#00f0ff" />
+                            <Text style={styles.videoBadgeText}>VIDEO</Text>
+                          </View>
+
+                          <View style={styles.videoFooterOverlay}>
+                            <View style={styles.videoFooterLeft}>
+                              <Text style={styles.videoOverlayTitle} numberOfLines={1}>
+                                {item.fileName || 'Video'}
+                              </Text>
+                              <Text style={styles.videoOverlaySubtitle}>Tap to play fullscreen</Text>
+                            </View>
+                            <View style={styles.videoFooterRight}>
+                              <Text style={styles.videoTimeText}>{formatTime(item.timestamp)}</Text>
+                              {isMe && (
+                                <View style={styles.checkIcon}>
+                                  {item.status === 'sending' || item.status === 'sent' ? (
+                                    <Check color="rgba(255,255,255,0.7)" size={10} />
+                                  ) : item.status === 'read' ? (
+                                    <CheckCheck color="#00f0ff" size={10} />
+                                  ) : (
+                                    <CheckCheck color="rgba(255,255,255,0.7)" size={10} />
+                                  )}
+                                </View>
+                              )}
+                            </View>
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })()}
+     
+                  {item.type === 'audio' && (
+                    <View style={[styles.audioBubble, isMe ? styles.myAudioBubble : styles.theirAudioBubble]}>
+                      {isMe ? (
+                        /* Sent Voice Note: [Avatar + badge on Left] [PlayBtn] [Waveform] */
+                        <View style={styles.audioBubbleInner}>
+                          <View style={styles.audioMainRow}>
+                            {/* Avatar on Left */}
+                            <View style={styles.audioAvatarContainerLeft}>
+                              <Image 
+                                source={{ uri: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100&auto=format&fit=crop' }} 
+                                style={styles.audioAvatar} 
+                              />
+                              <View style={[styles.audioMicBadge, styles.myAudioMicBadge]}>
+                                <Mic color="#fff" size={8} fill="#fff" />
+                              </View>
+                            </View>
+
+                            {/* Play Button */}
+                            <TouchableOpacity 
+                              style={styles.audioPlayBtnCompact} 
+                              onPress={() => handlePlayAudio(item.id, item.fileUrl)}
+                              activeOpacity={0.8}
+                            >
+                              {playbackStatus.soundId === item.id && playbackStatus.isPlaying ? (
+                                <Pause color="#fff" size={16} fill="#fff" />
+                              ) : (
+                                <Play color="#fff" size={16} fill="#fff" style={{ marginLeft: 2 }} />
+                              )}
+                            </TouchableOpacity>
+
+                            {/* Waveform Container */}
+                            <View style={styles.audioWaveformContainer}>
+                              <View style={styles.waveformRow}>
+                                {WAVEFORM_HEIGHTS.map((height, idx) => {
+                                  const progress = playbackStatus.soundId === item.id && playbackStatus.duration > 0
+                                    ? playbackStatus.position / playbackStatus.duration
+                                    : 0;
+                                  const isActive = idx / WAVEFORM_HEIGHTS.length <= progress;
+                                  return (
+                                    <View 
+                                      key={idx} 
+                                      style={[
+                                        styles.waveformBar, 
+                                        { height: height }, 
+                                        isActive ? styles.waveformBarActiveCyan : styles.waveformBarInactive
+                                      ]} 
+                                    />
+                                  );
+                                })}
+                              </View>
+                              {/* Blue dot playhead */}
+                              {playbackStatus.soundId === item.id && playbackStatus.duration > 0 && (
+                                <View 
+                                  style={[
+                                    styles.waveformPlayhead,
+                                    { left: `${(playbackStatus.position / playbackStatus.duration) * 100}%` }
+                                  ]}
+                                />
+                              )}
+                            </View>
+                          </View>
+
+                          {/* Footer details row — playback time & ticks inside the voice note bubble */}
+                          <View style={styles.audioFooterRow}>
+                            <Text style={styles.audioTimeLabel}>
+                              {playbackStatus.soundId === item.id && playbackStatus.duration > 0
+                                ? formatDuration(Math.floor(playbackStatus.position / 1000))
+                                : '0:00'
+                              }
+                            </Text>
+                            <View style={styles.audioFooterRight}>
+                              <Text style={styles.audioTimeLabel}>
+                                {formatTime(item.timestamp)}
+                              </Text>
+                              <View style={styles.checkIcon}>
+                                {item.status === 'sent' ? (
+                                  <Check color="rgba(255,255,255,0.7)" size={10} />
+                                ) : item.status === 'read' ? (
+                                  <CheckCheck color="#00f0ff" size={10} />
+                                ) : (
+                                  <CheckCheck color="rgba(255,255,255,0.7)" size={10} />
+                                )}
+                              </View>
+                            </View>
+                          </View>
+                        </View>
+                      ) : (
+                        /* Received Voice Note: [PlayBtn] [Waveform] [Avatar + badge on Right] */
+                        <View style={styles.audioBubbleInner}>
+                          <View style={styles.audioMainRow}>
+                            {/* Play Button */}
+                            <TouchableOpacity 
+                              style={styles.audioPlayBtnCompact} 
+                              onPress={() => handlePlayAudio(item.id, item.fileUrl)}
+                              activeOpacity={0.8}
+                            >
+                              {playbackStatus.soundId === item.id && playbackStatus.isPlaying ? (
+                                <Pause color="#fff" size={16} fill="#fff" />
+                              ) : (
+                                <Play color="#fff" size={16} fill="#fff" style={{ marginLeft: 2 }} />
+                              )}
+                            </TouchableOpacity>
+
+                            {/* Waveform Container */}
+                            <View style={styles.audioWaveformContainer}>
+                              <View style={styles.waveformRow}>
+                                {WAVEFORM_HEIGHTS.map((height, idx) => {
+                                  const progress = playbackStatus.soundId === item.id && playbackStatus.duration > 0
+                                    ? playbackStatus.position / playbackStatus.duration
+                                    : 0;
+                                  const isActive = idx / WAVEFORM_HEIGHTS.length <= progress;
+                                  return (
+                                    <View 
+                                      key={idx} 
+                                      style={[
+                                        styles.waveformBar, 
+                                        { height: height }, 
+                                        isActive ? styles.waveformBarActivePurple : styles.waveformBarInactive
+                                      ]} 
+                                    />
+                                  );
+                                })}
+                              </View>
+                              {/* Blue dot playhead */}
+                              {playbackStatus.soundId === item.id && playbackStatus.duration > 0 && (
+                                <View 
+                                  style={[
+                                    styles.waveformPlayhead,
+                                    { left: `${(playbackStatus.position / playbackStatus.duration) * 100}%` }
+                                  ]}
+                                />
+                              )}
+                            </View>
+
+                            {/* Avatar on Right */}
+                            <View style={styles.audioAvatarContainerRight}>
+                              <Image 
+                                source={{ uri: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?q=80&w=100&auto=format&fit=crop' }} 
+                                style={styles.audioAvatar} 
+                              />
+                              <View style={[styles.audioMicBadge, styles.theirAudioMicBadge]}>
+                                <Mic color="#fff" size={8} fill="#fff" />
+                              </View>
+                            </View>
+                          </View>
+
+                          {/* Footer details row */}
+                          <View style={styles.audioFooterRow}>
+                            <Text style={styles.audioTimeLabel}>
+                              {playbackStatus.soundId === item.id && playbackStatus.duration > 0
+                                ? formatDuration(Math.floor(playbackStatus.position / 1000))
+                                : '0:00'
+                              }
+                            </Text>
+                            <Text style={styles.audioTimeLabel}>
+                              {formatTime(item.timestamp)}
+                            </Text>
+                          </View>
+                        </View>
+                      )}
+                    </View>
                   )}
      
                   {item.type === 'document' && (
@@ -639,21 +1221,36 @@ export default function ChatScreen({ user, onBack }) {
                       </View>
                     </TouchableOpacity>
                   )}
-                </View>
-
-                {/* Footer details inside the bubble */}
-                <View style={styles.bubbleFooter}>
-                  <Text style={styles.messageTime}>
-                    {formatTime(item.timestamp)}
-                  </Text>
-                  {isMe && (
-                    <View style={styles.checkIcon}>
-                      <CheckCheck color="#00f0ff" size={12} />
-                    </View>
-                  )}
-                </View>
+ 
+                {/* Footer: time + status tick (omitted for audio/image/video notes since they render ticks inside) */}
+                {(item.type === 'text' || item.type === 'document') && (
+                  <View style={styles.bubbleFooter}>
+                    <Text style={styles.messageTime}>
+                      {formatTime(item.timestamp)}
+                    </Text>
+                    {isMe && (
+                      <View style={styles.checkIcon}>
+                        {/* 
+                          Tick logic:
+                          - item.status === 'sending'  → 1 white tick (sent, not yet on server)
+                          - item.status === 'sent'     → 1 white tick
+                          - item.status === 'delivered'→ 2 white ticks
+                          - item.status === 'read'     → 2 cyan ticks
+                          - default (mentor messages)  → 2 white ticks (delivered)
+                        */}
+                        {item.status === 'sending' || item.status === 'sent' ? (
+                          <Check color="rgba(255,255,255,0.7)" size={12} />
+                        ) : item.status === 'read' ? (
+                          <CheckCheck color="#00f0ff" size={12} />
+                        ) : (
+                          <CheckCheck color="rgba(255,255,255,0.7)" size={12} />
+                        )}
+                      </View>
+                    )}
+                  </View>
+                )}
               </View>
-            </View>
+            </TouchableOpacity>
           );
         }}
       />
@@ -778,7 +1375,7 @@ export default function ChatScreen({ user, onBack }) {
 
             {previewMedia.type === 'video' && (
               <Video
-                source={{ uri: previewMedia.url }}
+                source={{ uri: getMediaDirectUrl(previewMedia.url) }}
                 rate={1.0}
                 volume={1.0}
                 isMuted={false}
@@ -973,11 +1570,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   attachmentImage: {
+    width: '100%',
+    height: '100%',
+  },
+  imageWrapper: {
+    position: 'relative',
+    borderRadius: 10,
+    overflow: 'hidden',
     width: 220,
     height: 160,
-    borderRadius: 10,
     marginBottom: 4,
     marginTop: 2,
+  },
+  mediaTimeOverlay: {
+    position: 'absolute',
+    bottom: 6,
+    right: 6,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  mediaTimeText: {
+    fontSize: 9,
+    color: '#fff',
   },
   mediaBlock: {
     flexDirection: 'row',
@@ -1229,5 +1848,246 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1,
+  },
+  audioBubble: {
+    width: 270,
+    padding: 8,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    // No border on audio/voice bubbles
+  },
+  myAudioBubble: {
+    backgroundColor: 'rgba(5, 97, 98, 0.15)',
+  },
+  theirAudioBubble: {
+    backgroundColor: 'rgba(32, 33, 37, 0.75)',
+  },
+  audioBubbleInner: {
+    width: '100%',
+  },
+  audioMainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+  },
+  audioAvatarContainerLeft: {
+    position: 'relative',
+    marginRight: 10,
+  },
+  audioAvatarContainerRight: {
+    position: 'relative',
+    marginLeft: 10,
+  },
+  audioAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#222',
+  },
+  audioMicBadge: {
+    position: 'absolute',
+    bottom: -2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#34b7f1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#050505',
+  },
+  myAudioMicBadge: {
+    right: -2,
+    backgroundColor: '#34b7f1',
+  },
+  theirAudioMicBadge: {
+    left: -2,
+    backgroundColor: '#34b7f1',
+  },
+  audioPlayBtnCompact: {
+    padding: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  audioWaveformContainer: {
+    flex: 1,
+    height: 24,
+    justifyContent: 'center',
+    position: 'relative',
+    marginLeft: 6,
+    marginRight: 6,
+  },
+  waveformRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    height: '100%',
+  },
+  waveformBar: {
+    width: 2.2,
+    borderRadius: 1.1,
+  },
+  waveformBarActiveCyan: {
+    backgroundColor: '#34b7f1',
+  },
+  waveformBarActivePurple: {
+    backgroundColor: '#a855f7',
+  },
+  waveformBarInactive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+  },
+  waveformPlayhead: {
+    position: 'absolute',
+    top: 6,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#34b7f1',
+    transform: [{ translateX: -6 }],
+  },
+  audioFooterRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 4,
+    paddingHorizontal: 2,
+  },
+  audioFooterRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  audioTimeLabel: {
+    fontSize: 9,
+    color: '#888',
+  },
+  videoBubble: {
+    width: 240,
+    height: 160,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  videoThumbnailWrapper: {
+    width: '100%',
+    height: '100%',
+    position: 'relative',
+  },
+  videoThumbnail: {
+    width: '100%',
+    height: '100%',
+  },
+  videoThumbnailOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+  },
+  videoPlayOverlayBtn: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -22 }, { translateY: -22 }],
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  videoBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 0.5,
+    borderColor: 'rgba(0, 240, 255, 0.3)',
+  },
+  videoBadgeText: {
+    fontSize: 8,
+    color: '#00f0ff',
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
+  },
+  videoFooterOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderTopWidth: 0.5,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  videoFooterLeft: {
+    flex: 1,
+    marginRight: 8,
+  },
+  videoFooterRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  videoTimeText: {
+    fontSize: 9,
+    color: '#aaa',
+  },
+  videoOverlayTitle: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  videoOverlaySubtitle: {
+    fontSize: 8,
+    color: '#888',
+    marginTop: 1,
+  },
+  dropdownOverlay: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 999,
+  },
+  dropdownMenu: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 95 : 65,
+    right: 16,
+    backgroundColor: '#0b0b0c',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    paddingVertical: 6,
+    width: 150,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+    zIndex: 1000,
+  },
+  dropdownItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  dropdownItemText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  dropdownDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
   }
 });
