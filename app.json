@@ -38,6 +38,11 @@
           "photosPermission": "Allow Dxign.learn to access your photo library to select and upload doubt screenshots."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "306652a4-8422-4726-a79f-09e7021b1591"
+      }
+    }
   }
 }
