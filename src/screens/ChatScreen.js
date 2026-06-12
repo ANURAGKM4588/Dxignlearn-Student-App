@@ -11,9 +11,11 @@ import {
   ActivityIndicator, 
   Image,
   Vibration,
-  Alert
+  Alert,
+  Dimensions
 } from 'react-native';
 import { Audio, Video } from 'expo-av';
+import * as VideoThumbnails from 'expo-video-thumbnails';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Sharing from 'expo-sharing';
@@ -34,7 +36,8 @@ import {
   MoreVertical, 
   Volume2,
   X,
-  Trash
+  Trash,
+  Smile
 } from 'lucide-react-native';
 import { db, storage, APPS_SCRIPT_WEBHOOK } from '../services/firebase';
 import { 
@@ -52,33 +55,278 @@ import {
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import * as FileSystem from 'expo-file-system/legacy';
 
+const getDriveFileId = (url) => {
+  if (!url) return null;
+  let match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)\/view/);
+  if (match && match[1]) return match[1];
+  match = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (match && match[1]) return match[1];
+  match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  if (match && match[1]) return match[1];
+  return null;
+};
+
 const getMediaDirectUrl = (url) => {
   if (!url) return '';
-  let match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)\/view/);
-  if (match && match[1]) {
-    return `https://drive.google.com/uc?export=download&id=${match[1]}`;
-  }
-  match = url.match(/id=([a-zA-Z0-9_-]+)/);
-  if (url.includes('drive.google.com') && match && match[1]) {
-    return `https://drive.google.com/uc?export=download&id=${match[1]}`;
+  const fileId = getDriveFileId(url);
+  if (fileId) {
+    return `https://drive.google.com/uc?export=download&id=${fileId}`;
   }
   return url;
 };
 
 const getVideoThumbnailUrl = (url) => {
   if (!url) return '';
-  let match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)\/view/);
-  if (match && match[1]) {
-    return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w400`;
-  }
-  match = url.match(/id=([a-zA-Z0-9_-]+)/);
-  if (url.includes('drive.google.com') && match && match[1]) {
-    return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w400`;
+  const fileId = getDriveFileId(url);
+  if (fileId) {
+    return `https://drive.google.com/thumbnail?id=${fileId}&sz=w400`;
   }
   return url;
 };
 
 const WAVEFORM_HEIGHTS = [6, 12, 18, 14, 8, 10, 16, 22, 14, 12, 8, 6, 10, 16, 20, 14, 18, 12, 8, 6, 12, 16, 10, 8, 12, 14, 6];
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+// Max width a chat bubble image can occupy
+const CHAT_IMAGE_WIDTH = Math.round(SCREEN_WIDTH * 0.72);
+// Max height — portrait images capped so they don't fill the whole screen
+const CHAT_IMAGE_MAX_HEIGHT = Math.round(SCREEN_HEIGHT * 0.65);
+// Min height — even tiny images get a sensible floor
+const CHAT_IMAGE_MIN_HEIGHT = 80;
+
+const COMMON_EMOJIS = ['😀', '😂', '😍', '👍', '🙌', '🔥', '❤️', '👏', '🎉', '🚀', '💡', '💯', '🤔', '😢', '😎', '💻'];
+
+/**
+ * VideoChatPreview
+ * Shows a video thumbnail in the chat at the video's ACTUAL aspect ratio.
+ * Uses expo-av Video component (opacity:0, size 0) to detect:
+ *   - natural width/height via onReadyForDisplay
+ *   - duration via onPlaybackStatusUpdate
+ * Then renders the thumbnail image at that exact ratio.
+ */
+const VideoChatPreview = React.memo(({
+  videoUrl, thumbnailUrl, onPress, isMe, timestamp, itemStatus
+}) => {
+  const rs = isMe
+    ? { borderRadius: 16, borderTopRightRadius: 2 }
+    : { borderRadius: 16, borderTopLeftRadius: 2 };
+
+  const [frameHeight, setFrameHeight] = React.useState(
+    Math.round(CHAT_IMAGE_WIDTH * (9 / 16))  // default 16:9 until video loads
+  );
+  const [duration, setDuration] = React.useState('0:00');
+  const [dimsSet, setDimsSet] = React.useState(false);
+  const [localThumbnail, setLocalThumbnail] = React.useState(null);
+
+  React.useEffect(() => {
+    if (Platform.OS === 'web') return;
+    let active = true;
+    const generateThumbnail = async () => {
+      try {
+        const directUrl = getMediaDirectUrl(videoUrl);
+        if (!directUrl) return;
+        const { uri } = await VideoThumbnails.getThumbnailAsync(directUrl, {
+          time: 0,
+          quality: 0.6,
+        });
+        if (active && uri) {
+          setLocalThumbnail(uri);
+        }
+      } catch (e) {
+        console.warn('Error generating video thumbnail:', e);
+      }
+    };
+    generateThumbnail();
+    return () => {
+      active = false;
+    };
+  }, [videoUrl]);
+
+  const onReadyForDisplay = React.useCallback((e) => {
+    if (dimsSet) return;
+    const { width: vw, height: vh } = e.naturalSize || {};
+    if (vw && vh) {
+      const ratio = vh / vw;
+      const rawH = CHAT_IMAGE_WIDTH * ratio;
+      const h = Math.max(CHAT_IMAGE_MIN_HEIGHT, Math.min(rawH, CHAT_IMAGE_MAX_HEIGHT));
+      setFrameHeight(Math.round(h));
+      setDimsSet(true);
+    }
+  }, [dimsSet]);
+
+  const onPlaybackStatus = React.useCallback((status) => {
+    if (status.isLoaded && status.durationMillis && duration === '0:00') {
+      const totalSec = Math.floor(status.durationMillis / 1000);
+      const mins = Math.floor(totalSec / 60);
+      const secs = totalSec % 60;
+      setDuration(`${mins}:${secs < 10 ? '0' : ''}${secs}`);
+    }
+  }, [duration]);
+
+  const borderColor = isMe ? 'rgba(0,240,255,0.25)' : 'rgba(168,85,247,0.2)';
+
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.9}>
+      <View style={[{
+        width: CHAT_IMAGE_WIDTH,
+        height: frameHeight,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor,
+        backgroundColor: 'rgba(5,20,30,0.95)',
+      }, rs]}>
+
+        {/* Thumbnail image */}
+        <Image
+          source={{ uri: localThumbnail || thumbnailUrl }}
+          style={[{ width: '100%', height: '100%' }, rs]}
+          resizeMode="cover"
+        />
+
+        {/*
+          Hidden Video (0x0, opacity 0) — only loaded to read naturalSize & duration.
+          Not played. Unloads itself once we have both values.
+        */}
+        <Video
+          source={{ uri: getMediaDirectUrl(videoUrl) }}
+          style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}
+          shouldPlay={false}
+          isMuted={true}
+          onReadyForDisplay={onReadyForDisplay}
+          onPlaybackStatusUpdate={onPlaybackStatus}
+        />
+
+        {/* Dark overlay — clipped by parent overflow:hidden */}
+        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.3)' }]} />
+
+        {/* Centered play button */}
+        <View style={[StyleSheet.absoluteFillObject, { alignItems: 'center', justifyContent: 'center' }]}>
+          <View style={styles.videoPlayOverlayBtn}>
+            <Play color="#fff" size={28} fill="#fff" style={{ marginLeft: 3 }} />
+          </View>
+        </View>
+
+        {/* Bottom bar: HD + duration | timestamp + ticks */}
+        <View style={[styles.videoBottomBar]}>
+          <View style={styles.videoBottomLeft}>
+            <View style={styles.videoHDBadge}>
+              <Text style={styles.videoHDText}>HD</Text>
+            </View>
+            <Text style={styles.videoDurationText}>{duration}</Text>
+          </View>
+          <View style={styles.videoBottomRight}>
+            <Text style={styles.mediaTimestampText}>{timestamp}</Text>
+            {isMe && (
+              itemStatus === 'read'
+                ? <CheckCheck color="#00f0ff" size={12} />
+                : <CheckCheck color="rgba(255,255,255,0.85)" size={12} />
+            )}
+          </View>
+        </View>
+
+      </View>
+    </TouchableOpacity>
+  );
+});
+
+/**
+ * DynamicMediaPreview
+ * ─ Owns its own border + borderRadius + overflow:hidden (elevation 0 → clips correctly on Android)
+ * ─ Calls Image.getSize to render at the real image aspect ratio
+ * ─ Passes borderRadius down to overlays via renderOverlays(rs) render prop
+ */
+const DynamicMediaPreview = React.memo(({
+  uri, onPress, renderOverlays, isVideo,
+  borderColor, bgColor,
+  myBubble,          // true = sent (right), false = received (left)
+}) => {
+  // Border radius matching the chat bubble shape
+  const rs = myBubble
+    ? { borderRadius: 16, borderTopRightRadius: 2 }
+    : { borderRadius: 16, borderTopLeftRadius: 2 };
+
+  const fallbackHeight = isVideo
+    ? Math.round(CHAT_IMAGE_WIDTH * (9 / 16))
+    : Math.round(CHAT_IMAGE_WIDTH * (3 / 4));
+
+  const [frameSize, setFrameSize] = React.useState({
+    width: CHAT_IMAGE_WIDTH,
+    height: fallbackHeight,
+  });
+
+  React.useEffect(() => {
+    if (!uri) return;
+    Image.getSize(uri,
+      (naturalW, naturalH) => {
+        if (!naturalW || !naturalH) return;
+        const ratio = naturalH / naturalW;
+        const rawH = CHAT_IMAGE_WIDTH * ratio;
+        const h = Math.max(CHAT_IMAGE_MIN_HEIGHT, Math.min(rawH, CHAT_IMAGE_MAX_HEIGHT));
+        setFrameSize({ width: CHAT_IMAGE_WIDTH, height: Math.round(h) });
+      },
+      () => {}
+    );
+  }, [uri]);
+
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.9}>
+      {/*
+        This View is the TRUE clip container.
+        It has elevation:0 — so Android's overflow:'hidden' + borderRadius WORKS.
+        The parent messageBubble for media has elevation:0 too, no conflict.
+        borderWidth draws the bubble border, overflow clips the image to match.
+      */}
+      <View style={[
+        {
+          width: frameSize.width,
+          height: frameSize.height,
+          overflow: 'hidden',
+          borderWidth: 1,
+          borderColor: borderColor || 'rgba(0,240,255,0.25)',
+          backgroundColor: bgColor || 'rgba(0,0,0,0.7)',
+        },
+        rs,
+      ]}>
+        <Image
+          source={{ uri }}
+          style={[{ width: '100%', height: '100%' }, rs]}
+          resizeMode="cover"
+        />
+        {renderOverlays ? renderOverlays(rs) : null}
+      </View>
+    </TouchableOpacity>
+  );
+});
+
+const renderParsedText = (text, isMe) => {
+  if (!text) return null;
+  const regex = /("[^"]+")|(--\w+(?:\s+\d+:\d+|\s+\S+)?)/g;
+  const parts = text.split(regex);
+  return (
+    <Text style={[styles.messageText, isMe ? styles.myMessageText : styles.theirMessageText]}>
+      {parts.map((part, index) => {
+        if (!part) return null;
+        if (part.startsWith('"') && part.endsWith('"')) {
+          return (
+            <Text key={index} style={{ color: '#00f0ff', fontWeight: 'bold' }}>
+              {part}
+            </Text>
+          );
+        }
+        if (part.startsWith('--')) {
+          return (
+            <Text key={index} style={{ color: '#a855f7', fontWeight: 'bold', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>
+              {part}
+            </Text>
+          );
+        }
+        return part;
+      })}
+    </Text>
+  );
+};
+
 
 // Sort messages oldest-first by timestamp (new messages go to bottom)
 const sortByTime = (msgs) => {
@@ -102,8 +350,15 @@ export default function ChatScreen({ user, onBack }) {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
+  const [videoDownloading, setVideoDownloading] = useState(false);
+
+  const toggleEmojiPicker = () => {
+    setShowEmojiPicker(!showEmojiPicker);
+    setShowAttachmentMenu(false);
+  };
 
   // Audio Playback States
   const [playbackStatus, setPlaybackStatus] = useState({
@@ -144,15 +399,58 @@ export default function ChatScreen({ user, onBack }) {
     }
   };
 
-  const handlePressMessage = (item) => {
+  const handlePressMessage = async (item) => {
     if (isSelectionMode) {
       toggleSelectMessage(item.id);
     } else {
       // Normal bubble press -> trigger preview mode
       if (item.type === 'image') {
-        setPreviewMedia({ type: 'image', url: item.fileUrl });
+        const directUrl = getMediaDirectUrl(item.fileUrl, 'image');
+        setPreviewMedia({ type: 'image', url: directUrl });
       } else if (item.type === 'video') {
-        setPreviewMedia({ type: 'video', url: getMediaDirectUrl(item.fileUrl), fileName: item.fileName });
+        const fileId = getDriveFileId(item.fileUrl);
+        if (fileId) {
+          setVideoDownloading(true);
+          try {
+            const cacheDir = FileSystem.cacheDirectory;
+            const tempPath = `${cacheDir}preview_video_${item.id}.mp4`;
+            const info = await FileSystem.getInfoAsync(tempPath);
+            if (info.exists) {
+              setPreviewMedia({ type: 'video', url: tempPath, fileName: item.fileName });
+            } else {
+              const directUrl = getMediaDirectUrl(item.fileUrl);
+              console.log("Attempting direct video download using FileSystem.downloadAsync from:", directUrl);
+              try {
+                const downloadResult = await FileSystem.downloadAsync(directUrl, tempPath);
+                if (downloadResult && downloadResult.status === 200) {
+                  setPreviewMedia({ type: 'video', url: tempPath, fileName: item.fileName });
+                } else {
+                  throw new Error(`Direct download status code: ${downloadResult ? downloadResult.status : 'unknown'}`);
+                }
+              } catch (dlErr) {
+                console.warn("Direct download failed, falling back to Apps Script webhook base64 fetch:", dlErr);
+                // Fetch via webhook
+                const response = await fetch(`${APPS_SCRIPT_WEBHOOK}?action=get_file_base64&id=${fileId}`);
+                const result = await response.json();
+                if (result.status === 'success' && result.base64) {
+                  await FileSystem.writeAsStringAsync(tempPath, result.base64, {
+                    encoding: 'base64',
+                  });
+                  setPreviewMedia({ type: 'video', url: tempPath, fileName: item.fileName });
+                } else {
+                  throw new Error(result.message || 'Webhook download failed');
+                }
+              }
+            }
+          } catch (e) {
+            console.warn("Failed to download preview video:", e);
+            setPreviewMedia({ type: 'video', url: getMediaDirectUrl(item.fileUrl), fileName: item.fileName });
+          } finally {
+            setVideoDownloading(false);
+          }
+        } else {
+          setPreviewMedia({ type: 'video', url: item.fileUrl, fileName: item.fileName });
+        }
       } else if (item.type === 'document') {
         setPreviewMedia({ type: 'document', url: item.fileUrl, fileName: item.fileName });
       }
@@ -330,6 +628,7 @@ export default function ChatScreen({ user, onBack }) {
     };
 
     setInputText('');
+    setShowEmojiPicker(false);
     await saveMessage(msgData);
   };
 
@@ -479,8 +778,38 @@ export default function ChatScreen({ user, onBack }) {
       // Resolve the playback URI
       // Expo AV cannot play base64 data: URIs on native — must write to temp file first
       let playUri = getMediaDirectUrl(audioUrl);
-      
-      if (audioUrl && audioUrl.startsWith('data:')) {
+      const fileId = getDriveFileId(audioUrl);
+
+      if (fileId) {
+        try {
+          const cacheDir = FileSystem.cacheDirectory;
+          const files = await FileSystem.readDirectoryAsync(cacheDir);
+          const cachedFile = files.find(f => f.startsWith(`voice_${messageId}.`));
+          
+          if (cachedFile) {
+            playUri = `${cacheDir}${cachedFile}`;
+          } else {
+            // Fetch via Webhook to bypass Google Drive direct download credentials check
+            const fetchUrl = `${APPS_SCRIPT_WEBHOOK}?action=get_file_base64&id=${fileId}`;
+            const response = await fetch(fetchUrl);
+            const result = await response.json();
+            if (result.status === 'success' && result.base64) {
+              const mimeType = result.mimeType || 'audio/mp4';
+              const ext = mimeType.includes('webm') ? 'webm'
+                : mimeType.includes('ogg') ? 'ogg'
+                : (mimeType.includes('mp4') || mimeType.includes('m4a') || mimeType.includes('aac')) ? 'm4a'
+                : 'm4a';
+              const tempPath = `${FileSystem.cacheDirectory}voice_${messageId}.${ext}`;
+              await FileSystem.writeAsStringAsync(tempPath, result.base64, {
+                encoding: 'base64',
+              });
+              playUri = tempPath;
+            }
+          }
+        } catch (fetchErr) {
+          console.warn('Failed to fetch/write Drive audio file from Webhook:', fetchErr);
+        }
+      } else if (audioUrl && audioUrl.startsWith('data:')) {
         try {
           // Extract the base64 portion and MIME type
           const [header, base64Data] = audioUrl.split(',');
@@ -773,6 +1102,13 @@ export default function ChatScreen({ user, onBack }) {
     }
   };
 
+  const formatDuration = (sec) => {
+    if (typeof sec !== 'number' || isNaN(sec)) return '0:00';
+    const mins = Math.floor(sec / 60);
+    const secs = Math.floor(sec % 60);
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+
   const formatTime = (ts) => {
     if (!ts) return '';
     let seconds = 0;
@@ -791,12 +1127,6 @@ export default function ChatScreen({ user, onBack }) {
     }
     const date = new Date(seconds * 1000);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
-
-  const formatDuration = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
   return (
@@ -838,28 +1168,27 @@ export default function ChatScreen({ user, onBack }) {
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <TouchableOpacity style={styles.backButton} onPress={onBack}>
-              <ArrowLeft color="#00f0ff" size={20} />
+              <ArrowLeft color="#888" size={20} />
             </TouchableOpacity>
             
             <View style={styles.avatarContainer}>
-              <Image 
-                source={{ uri: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?q=80&w=100&auto=format&fit=crop' }} 
-                style={styles.avatar} 
-              />
+              <View style={styles.customAvatar}>
+                <Text style={styles.customAvatarText}>M</Text>
+              </View>
               <View style={[styles.statusDot, { backgroundColor: supportSettings.isOnline ? '#10b981' : '#ef4444' }]} />
             </View>
 
             <View style={styles.headerTextContainer}>
-              <Text style={styles.headerTitle} numberOfLines={1}>Anurag KM (Mentor)</Text>
-              <Text style={[styles.headerStatus, { color: supportSettings.isOnline ? '#10b981' : '#ef4444' }]}>
-                {supportSettings.isOnline ? 'online support' : 'offline support'}
+              <Text style={styles.headerTitle} numberOfLines={1}>MENTOR SUPPORT</Text>
+              <Text style={[styles.headerStatus, { color: supportSettings.isOnline ? '#00f0ff' : '#ef4444' }]}>
+                {supportSettings.isOnline ? 'ONLINE' : 'OFFLINE'}
               </Text>
             </View>
           </View>
 
           <View style={styles.headerRight}>
             <TouchableOpacity style={styles.headerIconButton}>
-              <Phone color="#00f0ff" size={18} />
+              <Phone color="#888" size={18} />
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.headerIconButton} 
@@ -911,7 +1240,6 @@ export default function ChatScreen({ user, onBack }) {
         data={messages}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.messageList}
-
         renderItem={({ item }) => {
           const isMe = item.sender === user.email;
           const isSelected = selectedMessageIds.includes(item.id);
@@ -926,142 +1254,133 @@ export default function ChatScreen({ user, onBack }) {
                 isSelected && { backgroundColor: 'rgba(0, 240, 255, 0.12)' }
               ]}
             >
-              <View style={[
-                styles.messageBubble, 
-                isMe ? styles.myBubble : styles.theirBubble,
-                (item.type === 'image' || item.type === 'video' || item.type === 'audio') && { 
-                  borderWidth: 0, 
-                  backgroundColor: 'transparent', 
-                  shadowOpacity: 0, 
-                  elevation: 0, 
-                  paddingHorizontal: 0, 
-                  paddingTop: 0, 
-                  paddingBottom: 0 
-                },
-                isSelected && { borderColor: 'rgba(0, 240, 255, 0.4)' }
-              ]}>
-                {isSelectionMode && (
-                  <View style={[StyleSheet.absoluteFillObject, { zIndex: 9999 }]} />
-                )}
-                 {!isMe && <Text style={styles.senderName}>{item.name || "Mentor"}</Text>}
-                
-                {/* Message Body Content */}
-                {item.type === 'text' && (
-                  <View style={styles.bubbleContent}>
-                    <Text style={[styles.messageText, isMe ? styles.myMessageText : styles.theirMessageText]}>
-                      {item.text}
-                    </Text>
-                  </View>
-                )}
-     
-                  {item.type === 'image' && (
-                    <View style={styles.imageWrapper}>
-                      <TouchableOpacity onPress={() => setPreviewMedia({ type: 'image', url: item.fileUrl })}>
-                        <Image source={{ uri: item.fileUrl }} style={styles.attachmentImage} resizeMode="cover" />
-                      </TouchableOpacity>
-                      <View style={styles.mediaTimeOverlay}>
-                        <Text style={styles.mediaTimeText}>{formatTime(item.timestamp)}</Text>
-                        {isMe && (
-                          <View style={styles.checkIcon}>
-                            {item.status === 'sending' || item.status === 'sent' ? (
-                              <Check color="rgba(255,255,255,0.7)" size={10} />
-                            ) : item.status === 'read' ? (
-                              <CheckCheck color="#00f0ff" size={10} />
-                            ) : (
-                              <CheckCheck color="rgba(255,255,255,0.7)" size={10} />
-                            )}
-                          </View>
-                        )}
-                      </View>
-                    </View>
+              <View style={{ flexDirection: 'column', maxWidth: '85%', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
+                <View style={[
+                  styles.messageBubble, 
+                  isMe ? styles.myBubble : styles.theirBubble,
+                  item.type === 'audio' && { 
+                    borderWidth: 0, 
+                    backgroundColor: 'transparent', 
+                    shadowOpacity: 0, 
+                    elevation: 0, 
+                    paddingHorizontal: 0, 
+                    paddingTop: 0, 
+                    paddingBottom: 0 
+                  },
+                  // For image/video: DynamicMediaPreview owns the border+radius+clipping.
+                  // Strip everything from the bubble so it's invisible — elevation:0
+                  // prevents Android from fighting the child's overflow:hidden.
+                  (item.type === 'image' || item.type === 'video') && {
+                    paddingHorizontal: 0,
+                    paddingTop: 0,
+                    paddingBottom: 0,
+                    backgroundColor: 'transparent',
+                    borderWidth: 0,
+                    shadowOpacity: 0,
+                    elevation: 0,
+                  },
+                  isSelected && { borderColor: 'rgba(0, 240, 255, 0.4)' }
+                ]}>
+                  {isSelectionMode && (
+                    <View style={[StyleSheet.absoluteFillObject, { zIndex: 9999 }]} />
                   )}
-     
-                  {item.type === 'video' && (() => {
-                    const playUrl = getMediaDirectUrl(item.fileUrl);
-                    const isDrive = item.fileUrl && item.fileUrl.includes('drive.google.com');
-                    const isLocalOrFirebase = !isDrive;
-                    
-                    return (
-                      <TouchableOpacity 
-                        style={styles.videoBubble} 
-                        onPress={() => setPreviewMedia({ type: 'video', url: playUrl, fileName: item.fileName })}
-                        activeOpacity={0.88}
-                      >
-                        <View style={styles.videoThumbnailWrapper}>
-                          {isLocalOrFirebase ? (
-                            <Video
-                              source={{ uri: playUrl }}
-                              rate={1.0}
-                              volume={0.0}
-                              isMuted={true}
-                              resizeMode="cover"
-                              shouldPlay={false}
-                              style={styles.videoThumbnail}
-                            />
-                          ) : (
-                            <Image 
-                              source={{ uri: getVideoThumbnailUrl(item.fileUrl) }} 
-                              style={styles.videoThumbnail} 
-                              resizeMode="cover" 
-                            />
-                          )}
+                  
+                  {/* Inline Media Frame or Document Card */}
+                  {item.fileUrl && (
+                    <View style={[
+                      styles.attachmentCardContainer,
+                      (item.type === 'image' || item.type === 'video') && { margin: 0, padding: 0 }
+                    ]}>
 
-                          <View style={styles.videoThumbnailOverlay} />
-
-                          <View style={styles.videoPlayOverlayBtn}>
-                            <Play color="#fff" size={28} fill="rgba(255,255,255,0.9)" style={{ marginLeft: 3 }} />
-                          </View>
-
-                          <View style={styles.videoBadge}>
-                            <VideoIcon color="#00f0ff" size={10} fill="#00f0ff" />
-                            <Text style={styles.videoBadgeText}>VIDEO</Text>
-                          </View>
-
-                          <View style={styles.videoFooterOverlay}>
-                            <View style={styles.videoFooterLeft}>
-                              <Text style={styles.videoOverlayTitle} numberOfLines={1}>
-                                {item.fileName || 'Video'}
-                              </Text>
-                              <Text style={styles.videoOverlaySubtitle}>Tap to play fullscreen</Text>
-                            </View>
-                            <View style={styles.videoFooterRight}>
-                              <Text style={styles.videoTimeText}>{formatTime(item.timestamp)}</Text>
+                      {/* ── IMAGE ── */}
+                      {item.type === 'image' && (
+                        <DynamicMediaPreview
+                          uri={getMediaDirectUrl(item.fileUrl, 'image')}
+                          onPress={() => handlePressMessage(item)}
+                          isVideo={false}
+                          myBubble={isMe}
+                          borderColor={isMe ? 'rgba(0,240,255,0.25)' : 'rgba(168,85,247,0.2)'}
+                          bgColor="rgba(0,0,0,0.5)"
+                          renderOverlays={() => (
+                            <View style={styles.mediaTimestampOverlay}>
+                              <Text style={styles.mediaTimestampText}>{formatTime(item.timestamp)}</Text>
                               {isMe && (
-                                <View style={styles.checkIcon}>
-                                  {item.status === 'sending' || item.status === 'sent' ? (
-                                    <Check color="rgba(255,255,255,0.7)" size={10} />
-                                  ) : item.status === 'read' ? (
-                                    <CheckCheck color="#00f0ff" size={10} />
-                                  ) : (
-                                    <CheckCheck color="rgba(255,255,255,0.7)" size={10} />
-                                  )}
-                                </View>
+                                item.status === 'read'
+                                  ? <CheckCheck color="#00f0ff" size={12} />
+                                  : <CheckCheck color="rgba(255,255,255,0.85)" size={12} />
                               )}
                             </View>
+                          )}
+                        />
+                      )}
+
+                      {/* ── VIDEO ── actual dimensions via Video.onReadyForDisplay */}
+                      {item.type === 'video' && (
+                        <VideoChatPreview
+                          videoUrl={item.fileUrl}
+                          thumbnailUrl={getVideoThumbnailUrl(item.fileUrl)}
+                          onPress={() => handlePressMessage(item)}
+                          isMe={isMe}
+                          timestamp={formatTime(item.timestamp)}
+                          itemStatus={item.status}
+                        />
+                      )}
+
+
+                      {item.type === 'document' && (
+                        <TouchableOpacity 
+                          style={[
+                            styles.attachmentCard,
+                            isMe ? styles.myAttachmentCard : styles.theirAttachmentCard
+                          ]}
+                          onPress={() => handlePressMessage(item)}
+                          activeOpacity={0.8}
+                        >
+                          <View style={styles.attachmentIconWrapper}>
+                            <FileText color="#00f0ff" size={18} />
                           </View>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })()}
-     
+                          <View style={styles.attachmentInfo}>
+                            <Text style={styles.attachmentFileName} numberOfLines={1}>
+                              {item.fileName || 'document.pdf'}
+                            </Text>
+                            <Text style={styles.attachmentFileMeta}>
+                              850 KB • DOCUMENT
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
+
+                  {/* Render text if it exists */}
+                  {item.text ? (
+                    <View style={[
+                      styles.bubbleContent, 
+                      (item.type === 'image' || item.type === 'video' || item.type === 'document') && { marginTop: 4 },
+                      // Re-add horizontal padding for captions inside media bubbles (bubble has padding:0)
+                      (item.type === 'image' || item.type === 'video') && { paddingHorizontal: 10, paddingBottom: 6, paddingTop: 2 },
+                    ]}>
+                      {renderParsedText(item.text, isMe)}
+                    </View>
+                  ) : null}
+
+       
                   {item.type === 'audio' && (
                     <View style={[styles.audioBubble, isMe ? styles.myAudioBubble : styles.theirAudioBubble]}>
                       {isMe ? (
-                        /* Sent Voice Note: [Avatar + badge on Left] [PlayBtn] [Waveform] */
+                        /* Sent Voice Note (Student) */
                         <View style={styles.audioBubbleInner}>
                           <View style={styles.audioMainRow}>
-                            {/* Avatar on Left */}
                             <View style={styles.audioAvatarContainerLeft}>
                               <Image 
-                                source={{ uri: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100&auto=format&fit=crop' }} 
+                                source={{ uri: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?q=80&w=100&auto=format&fit=crop' }} 
                                 style={styles.audioAvatar} 
                               />
-                              <View style={[styles.audioMicBadge, styles.myAudioMicBadge]}>
+                              <View style={[styles.audioMicBadge, styles.myAudioMicBadge, { backgroundColor: '#a855f7' }]}>
                                 <Mic color="#fff" size={8} fill="#fff" />
                               </View>
                             </View>
 
-                            {/* Play Button */}
                             <TouchableOpacity 
                               style={styles.audioPlayBtnCompact} 
                               onPress={() => handlePlayAudio(item.id, item.fileUrl)}
@@ -1074,7 +1393,6 @@ export default function ChatScreen({ user, onBack }) {
                               )}
                             </TouchableOpacity>
 
-                            {/* Waveform Container */}
                             <View style={styles.audioWaveformContainer}>
                               <View style={styles.waveformRow}>
                                 {WAVEFORM_HEIGHTS.map((height, idx) => {
@@ -1088,25 +1406,23 @@ export default function ChatScreen({ user, onBack }) {
                                       style={[
                                         styles.waveformBar, 
                                         { height: height }, 
-                                        isActive ? styles.waveformBarActiveCyan : styles.waveformBarInactive
+                                        isActive ? styles.waveformBarActivePurple : styles.waveformBarInactive
                                       ]} 
                                     />
                                   );
                                 })}
                               </View>
-                              {/* Blue dot playhead */}
                               {playbackStatus.soundId === item.id && playbackStatus.duration > 0 && (
                                 <View 
                                   style={[
                                     styles.waveformPlayhead,
-                                    { left: `${(playbackStatus.position / playbackStatus.duration) * 100}%` }
+                                    { left: `${(playbackStatus.position / playbackStatus.duration) * 100}%`, backgroundColor: '#a855f7' }
                                   ]}
                                 />
                               )}
                             </View>
                           </View>
 
-                          {/* Footer details row — playback time & ticks inside the voice note bubble */}
                           <View style={styles.audioFooterRow}>
                             <Text style={styles.audioTimeLabel}>
                               {playbackStatus.soundId === item.id && playbackStatus.duration > 0
@@ -1131,10 +1447,9 @@ export default function ChatScreen({ user, onBack }) {
                           </View>
                         </View>
                       ) : (
-                        /* Received Voice Note: [PlayBtn] [Waveform] [Avatar + badge on Right] */
+                        /* Received Voice Note (Mentor) */
                         <View style={styles.audioBubbleInner}>
                           <View style={styles.audioMainRow}>
-                            {/* Play Button */}
                             <TouchableOpacity 
                               style={styles.audioPlayBtnCompact} 
                               onPress={() => handlePlayAudio(item.id, item.fileUrl)}
@@ -1147,7 +1462,6 @@ export default function ChatScreen({ user, onBack }) {
                               )}
                             </TouchableOpacity>
 
-                            {/* Waveform Container */}
                             <View style={styles.audioWaveformContainer}>
                               <View style={styles.waveformRow}>
                                 {WAVEFORM_HEIGHTS.map((height, idx) => {
@@ -1161,36 +1475,33 @@ export default function ChatScreen({ user, onBack }) {
                                       style={[
                                         styles.waveformBar, 
                                         { height: height }, 
-                                        isActive ? styles.waveformBarActivePurple : styles.waveformBarInactive
+                                        isActive ? styles.waveformBarActiveCyan : styles.waveformBarInactive
                                       ]} 
                                     />
                                   );
                                 })}
                               </View>
-                              {/* Blue dot playhead */}
                               {playbackStatus.soundId === item.id && playbackStatus.duration > 0 && (
                                 <View 
                                   style={[
                                     styles.waveformPlayhead,
-                                    { left: `${(playbackStatus.position / playbackStatus.duration) * 100}%` }
+                                    { left: `${(playbackStatus.position / playbackStatus.duration) * 100}%`, backgroundColor: '#00f0ff' }
                                   ]}
                                 />
                               )}
                             </View>
 
-                            {/* Avatar on Right */}
                             <View style={styles.audioAvatarContainerRight}>
                               <Image 
-                                source={{ uri: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?q=80&w=100&auto=format&fit=crop' }} 
+                                source={{ uri: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100&auto=format&fit=crop' }} 
                                 style={styles.audioAvatar} 
                               />
-                              <View style={[styles.audioMicBadge, styles.theirAudioMicBadge]}>
+                              <View style={[styles.audioMicBadge, styles.theirAudioMicBadge, { backgroundColor: '#00f0ff' }]}>
                                 <Mic color="#fff" size={8} fill="#fff" />
                               </View>
                             </View>
                           </View>
 
-                          {/* Footer details row */}
                           <View style={styles.audioFooterRow}>
                             <Text style={styles.audioTimeLabel}>
                               {playbackStatus.soundId === item.id && playbackStatus.duration > 0
@@ -1206,44 +1517,20 @@ export default function ChatScreen({ user, onBack }) {
                       )}
                     </View>
                   )}
-     
-                  {item.type === 'document' && (
-                    <TouchableOpacity 
-                      style={styles.mediaBlock} 
-                      onPress={() => setPreviewMedia({ type: 'document', url: item.fileUrl, fileName: item.fileName })}
-                    >
-                      <View style={styles.mediaIconWrapper}>
-                        <FileText color="#a855f7" size={20} />
-                      </View>
-                      <View style={styles.mediaDetails}>
-                        <Text style={styles.mediaTitle} numberOfLines={1}>{item.fileName}</Text>
-                        <Text style={styles.mediaSubtitle}>Tap to preview document</Text>
-                      </View>
-                    </TouchableOpacity>
-                  )}
- 
-                {/* Footer: time + status tick (omitted for audio/image/video notes since they render ticks inside) */}
-                {(item.type === 'text' || item.type === 'document') && (
-                  <View style={styles.bubbleFooter}>
-                    <Text style={styles.messageTime}>
-                      {formatTime(item.timestamp)}
-                    </Text>
+                </View>
+
+                {/* Timestamp below/outside the bubble — hidden for image/video (shown overlaid inside) */}
+                {item.type !== 'audio' && item.type !== 'image' && item.type !== 'video' && (
+                  <View style={[styles.bubbleFooterOutside, isMe ? styles.myBubbleFooterOutside : styles.theirBubbleFooterOutside]}>
+                    <Text style={styles.messageTimeOutside}>{formatTime(item.timestamp)}</Text>
                     {isMe && (
-                      <View style={styles.checkIcon}>
-                        {/* 
-                          Tick logic:
-                          - item.status === 'sending'  → 1 white tick (sent, not yet on server)
-                          - item.status === 'sent'     → 1 white tick
-                          - item.status === 'delivered'→ 2 white ticks
-                          - item.status === 'read'     → 2 cyan ticks
-                          - default (mentor messages)  → 2 white ticks (delivered)
-                        */}
+                      <View style={styles.checkIconOutside}>
                         {item.status === 'sending' || item.status === 'sent' ? (
-                          <Check color="rgba(255,255,255,0.7)" size={12} />
+                          <Check color="rgba(255,255,255,0.4)" size={10} />
                         ) : item.status === 'read' ? (
-                          <CheckCheck color="#00f0ff" size={12} />
+                          <CheckCheck color="#00f0ff" size={10} />
                         ) : (
-                          <CheckCheck color="rgba(255,255,255,0.7)" size={12} />
+                          <CheckCheck color="rgba(255,255,255,0.4)" size={10} />
                         )}
                       </View>
                     )}
@@ -1263,7 +1550,7 @@ export default function ChatScreen({ user, onBack }) {
         </View>
       )}
 
-      {/* 4. WhatsApp-styled Attachment Menu with Frosted Glassmorphism */}
+      {/* 4. Attachment Menu */}
       {showAttachmentMenu && (
         <View style={styles.attachmentTray}>
           <TouchableOpacity style={styles.trayItem} onPress={pickDocument}>
@@ -1289,10 +1576,9 @@ export default function ChatScreen({ user, onBack }) {
         </View>
       )}
 
-      {/* 5. Input Bar (WhatsApp-structured, Glassmorphic style) */}
+      {/* 5. Input Bar */}
       <View style={styles.inputContainer}>
         {isRecording ? (
-          /* Voice Recording Input Mode */
           <View style={styles.recordingContainer}>
             <View style={styles.recordingDurationWrapper}>
               <View style={styles.recordingDot} />
@@ -1303,24 +1589,34 @@ export default function ChatScreen({ user, onBack }) {
             </TouchableOpacity>
           </View>
         ) : (
-          /* Normal Message Input Mode */
           <View style={styles.inputBarWrapper}>
             <TouchableOpacity 
-              style={styles.attachmentButton}
-              onPress={() => setShowAttachmentMenu(!showAttachmentMenu)}
+              style={styles.emojiButton}
+              onPress={toggleEmojiPicker}
             >
-              <Paperclip color={showAttachmentMenu ? "#00f0ff" : "#888"} size={20} />
+              <Smile color={showEmojiPicker ? "#00f0ff" : "rgba(255, 255, 255, 0.75)"} size={20} />
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.attachmentButton}
+              onPress={() => {
+                setShowAttachmentMenu(!showAttachmentMenu);
+                setShowEmojiPicker(false);
+              }}
+            >
+              <Paperclip color={showAttachmentMenu ? "#00f0ff" : "rgba(255, 255, 255, 0.75)"} size={20} />
             </TouchableOpacity>
 
             <TextInput
               style={styles.input}
-              placeholder="Type your doubt..."
+              placeholder="Type a message..."
               placeholderTextColor="#555"
               value={inputText}
               onChangeText={(text) => {
                 setInputText(text);
                 if (showAttachmentMenu) setShowAttachmentMenu(false);
               }}
+              onFocus={() => setShowEmojiPicker(false)}
               multiline
             />
           </View>
@@ -1345,13 +1641,33 @@ export default function ChatScreen({ user, onBack }) {
               if (Platform.OS !== 'web') {
                 Vibration.vibrate(40);
               }
-              alert("Hold to record a voice note.");
+              Alert.alert("Doubt Support", "Hold to record a voice note.");
             }}
           >
-            <Mic color="#050505" size={18} />
+            <Mic color={isRecording ? "#ffffff" : "#050505"} size={18} />
           </TouchableOpacity>
         )}
       </View>
+
+      {/* Emoji Picker Tray */}
+      {showEmojiPicker && (
+        <View style={styles.emojiPickerContainer}>
+          <FlatList
+            data={COMMON_EMOJIS}
+            keyExtractor={(item, index) => index.toString()}
+            numColumns={8}
+            contentContainerStyle={styles.emojiPickerList}
+            renderItem={({ item }) => (
+              <TouchableOpacity 
+                style={styles.emojiItem} 
+                onPress={() => setInputText(prev => prev + item)}
+              >
+                <Text style={styles.emojiText}>{item}</Text>
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+      )}
 
       {/* 6. Media Preview Modal (Frosted Glass Fullscreen Overlay) */}
       {previewMedia && (
@@ -1375,7 +1691,7 @@ export default function ChatScreen({ user, onBack }) {
 
             {previewMedia.type === 'video' && (
               <Video
-                source={{ uri: getMediaDirectUrl(previewMedia.url) }}
+                source={{ uri: previewMedia.url }}
                 rate={1.0}
                 volume={1.0}
                 isMuted={false}
@@ -1406,6 +1722,13 @@ export default function ChatScreen({ user, onBack }) {
               </View>
             )}
           </View>
+        </View>
+      )}
+
+      {videoDownloading && (
+        <View style={styles.videoLoadingOverlay}>
+          <ActivityIndicator size="large" color="#00f0ff" />
+          <Text style={styles.videoLoadingText}>Optimizing video stream...</Text>
         </View>
       )}
     </KeyboardAvoidingView>
@@ -1441,13 +1764,20 @@ const styles = StyleSheet.create({
     position: 'relative',
     marginRight: 12,
   },
-  avatar: {
+  customAvatar: {
     width: 38,
     height: 38,
     borderRadius: 19,
     backgroundColor: 'rgba(0, 240, 255, 0.1)',
     borderWidth: 1.5,
     borderColor: '#00f0ff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  customAvatarText: {
+    color: '#00f0ff',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
   statusDot: {
     position: 'absolute',
@@ -1500,7 +1830,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   messageBubble: {
-    maxWidth: '85%',
+    maxWidth: '100%',
     paddingHorizontal: 12,
     paddingTop: 8,
     paddingBottom: 6,
@@ -1513,7 +1843,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 240, 255, 0.08)',
     borderColor: 'rgba(0, 240, 255, 0.25)',
     borderTopRightRadius: 2,
-    alignSelf: 'flex-end',
     shadowColor: '#00f0ff',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
@@ -1525,12 +1854,22 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(168, 85, 247, 0.08)',
     borderColor: 'rgba(168, 85, 247, 0.2)',
     borderTopLeftRadius: 2,
-    alignSelf: 'flex-start',
     shadowColor: '#a855f7',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 6,
     elevation: 3,
+  },
+  // Mirror the bubble corner radii for DynamicMediaPreview clipping
+  // Sent (right side): top-right corner is the "tail" → nearly square
+  myBubbleMediaRadius: {
+    borderRadius: 16,
+    borderTopRightRadius: 2,
+  },
+  // Received (left side): top-left corner is the "tail" → nearly square
+  theirBubbleMediaRadius: {
+    borderRadius: 16,
+    borderTopLeftRadius: 2,
   },
   senderName: {
     color: '#a855f7',
@@ -1551,6 +1890,30 @@ const styles = StyleSheet.create({
   theirMessageText: {
     color: '#e9edef',
   },
+  bubbleFooterOutside: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    gap: 4,
+  },
+  myBubbleFooterOutside: {
+    justifyContent: 'flex-end',
+    alignSelf: 'flex-end',
+    marginRight: 4,
+  },
+  theirBubbleFooterOutside: {
+    justifyContent: 'flex-start',
+    alignSelf: 'flex-start',
+    marginLeft: 4,
+  },
+  messageTimeOutside: {
+    fontSize: 9,
+    color: '#888',
+  },
+  checkIconOutside: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   bubbleFooter: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
@@ -1569,18 +1932,89 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  // Container wrapping image/video/document in bubble (no extra margin for media types)
+  attachmentCardContainer: {
+    // For document cards — slight vertical spacing
+    // For image/video — overridden inline to margin: 0
+  },
+  // Document attachment card styles
+  attachmentCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    borderRadius: 12,
+    gap: 10,
+    minWidth: 180,
+    maxWidth: CHAT_IMAGE_WIDTH,
+  },
+  myAttachmentCard: {
+    backgroundColor: 'rgba(0, 240, 255, 0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 240, 255, 0.2)',
+  },
+  theirAttachmentCard: {
+    backgroundColor: 'rgba(168, 85, 247, 0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.2)',
+  },
+  attachmentIconWrapper: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0, 240, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attachmentInfo: {
+    flex: 1,
+  },
+  attachmentFileName: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  attachmentFileMeta: {
+    fontSize: 9,
+    color: '#666',
+    marginTop: 2,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  // Emoji picker styles
+  emojiButton: {
+    padding: 4,
+    marginLeft: 4,
+  },
+  emojiPickerContainer: {
+    backgroundColor: '#0b0b0c',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.06)',
+    maxHeight: 220,
+  },
+  emojiPickerList: {
+    paddingHorizontal: 8,
+    paddingVertical: 10,
+  },
+  emojiItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+  },
+  emojiText: {
+    fontSize: 24,
+  },
   attachmentImage: {
     width: '100%',
     height: '100%',
   },
   imageWrapper: {
-    position: 'relative',
-    borderRadius: 10,
+    width: CHAT_IMAGE_WIDTH,
+    // 4:3 aspect ratio — portrait images will be trimmed to this frame
+    aspectRatio: 4 / 3,
     overflow: 'hidden',
-    width: 220,
-    height: 160,
-    marginBottom: 4,
-    marginTop: 2,
+    borderRadius: 0, // bubble already has borderRadius + overflow:hidden
   },
   mediaTimeOverlay: {
     position: 'absolute',
@@ -1790,10 +2224,9 @@ const styles = StyleSheet.create({
   },
   previewContentContainer: {
     width: '100%',
-    height: '80%',
+    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
   },
   fullPreviewImage: {
     width: '100%',
@@ -1850,7 +2283,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   audioBubble: {
-    width: 270,
+    width: 240,
     padding: 8,
     borderRadius: 14,
     backgroundColor: 'rgba(255, 255, 255, 0.02)',
@@ -1963,10 +2396,11 @@ const styles = StyleSheet.create({
     color: '#888',
   },
   videoBubble: {
-    width: 240,
-    height: 160,
-    borderRadius: 14,
+    width: CHAT_IMAGE_WIDTH,
+    // 16:9 aspect ratio for video thumbnails
+    aspectRatio: 16 / 9,
     overflow: 'hidden',
+    borderRadius: 0, // bubble already has borderRadius + overflow:hidden
   },
   videoThumbnailWrapper: {
     width: '100%',
@@ -1985,15 +2419,79 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: '50%',
     left: '50%',
-    transform: [{ translateX: -22 }, { translateY: -22 }],
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    transform: [{ translateX: -25 }, { translateY: -25 }],
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+
+  // ── WhatsApp-style media timestamp overlay ──
+  // Shared: semi-transparent pill at bottom-right of image or video
+  mediaTimestampOverlay: {
+    position: 'absolute',
+    bottom: 7,
+    right: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  mediaTimestampText: {
+    fontSize: 10,
+    color: '#fff',
+    fontWeight: '500',
+  },
+
+  // Video bottom bar: HD+duration on left, timestamp+tick on right
+  videoBottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 7,
+    // Subtle gradient-like fade from transparent to dark at the bottom
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  videoBottomLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  videoBottomRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  videoHDBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
+    borderRadius: 3,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+  },
+  videoHDText: {
+    fontSize: 9,
+    color: '#fff',
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  videoDurationText: {
+    fontSize: 10,
+    color: '#fff',
+    fontWeight: '500',
   },
   videoBadge: {
     position: 'absolute',
@@ -2089,5 +2587,19 @@ const styles = StyleSheet.create({
   dropdownDivider: {
     height: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  videoLoadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(5, 5, 5, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 99999,
+  },
+  videoLoadingText: {
+    color: '#00f0ff',
+    fontSize: 12,
+    fontWeight: 'bold',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    marginTop: 12,
   }
 });
