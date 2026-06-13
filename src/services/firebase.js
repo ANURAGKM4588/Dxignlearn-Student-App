@@ -42,7 +42,7 @@ export const db = getFirestore(app);
 export const storage = getStorage(app);
 
 // Your Google Apps Script Webhook URL (used for Whitelist checking & sending free OTPs)
-export const APPS_SCRIPT_WEBHOOK = "https://script.google.com/macros/s/AKfycbyDPAWjWdhYJl4ctO-JPCEYjBuoa5Q2RbYCGhgo_0kpzJkFcH4o_PpedSDhNmvGMYN7/exec";
+export const APPS_SCRIPT_WEBHOOK = "https://script.google.com/macros/s/AKfycbyFy1NDZenqLCptmKPJI4-xfBReaV4fVX-GMhtKzMfPxnwj_hWKeQm2efcDGnYZvz-9/exec";
 
 // Razorpay Payment Links for Courses (Replace these placeholders with your real Razorpay links)
 export const COURSE_PAYMENT_LINKS = {
