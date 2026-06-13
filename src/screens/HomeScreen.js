@@ -224,7 +224,7 @@ export default function HomeScreen({ user, onNavigateToTab }) {
                   onPress={() => Linking.openURL(COURSE_PAYMENT_LINKS[course])}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.catalogBuyBtnText}>BUY NOW</Text>
+                  <Text style={styles.catalogBuyBtnText}>ENROLL FREE</Text>
                 </TouchableOpacity>
               </View>
             ))}

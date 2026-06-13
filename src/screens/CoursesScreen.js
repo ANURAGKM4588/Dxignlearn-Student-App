@@ -237,7 +237,7 @@ export default function CoursesScreen({ user }) {
               onPress={() => Linking.openURL(COURSE_PAYMENT_LINKS[selectedCourse])}
               activeOpacity={0.8}
             >
-              <Text style={styles.buyBtnText}>BUY & UNLOCK NOW</Text>
+              <Text style={styles.buyBtnText}>GET FREE ACCESS</Text>
             </TouchableOpacity>
           </View>
         ) : currentVideo && currentVideo.videoUrl ? (

@@ -55,11 +55,11 @@ export const COURSE_PAYMENT_LINKS = {
 
 // Course Pricing Details for UI Display
 export const COURSE_PRICING = {
-  "Graphic Design": "₹499",
-  "Film Making": "₹999",
-  "Content Creation": "₹399",
-  "Vibe Coding": "₹599",
-  "Business Automation": "₹799"
+  "Graphic Design": "FREE",
+  "Film Making": "FREE",
+  "Content Creation": "FREE",
+  "Vibe Coding": "FREE",
+  "Business Automation": "FREE"
 };
 
 /**
